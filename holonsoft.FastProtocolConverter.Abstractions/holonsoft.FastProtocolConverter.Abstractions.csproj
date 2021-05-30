@@ -13,6 +13,7 @@ Converts raw bytes (e. g. from a hardware device) data to an instance of a class
     <RepositoryUrl>https://github.com/holonsoft/FastProtocolConverter</RepositoryUrl>
     <RepositoryType>GIT</RepositoryType>
     <PackageTags>#net4.7.2 #net4.8 #netcore3.1 #net5</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
