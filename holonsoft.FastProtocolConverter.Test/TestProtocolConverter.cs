@@ -14,14 +14,14 @@ namespace holonsoft.FastProtocolConverter.Test
 {
 	public class TestProtocolConverter
 	{
-		private readonly ILogger<TestProtocolConverter> _logger = null;
+		private ILogger<TestProtocolConverter> _logger = null;
 
 		[Fact]
 		public void TestMissingPrepareCall()
 		{
 			var converter = new ProtocolConverter<DumbPoco>(_logger);
 
-			Assert.Throws<ArgumentException>(() => converter.ConvertFromByteArray(new byte[10]));
+			Assert.Throws<ArgumentOutOfRangeException>(() => converter.ConvertFromByteArray(new byte[10]));
 		}
 
 

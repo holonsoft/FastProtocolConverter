@@ -18,7 +18,7 @@ Converts raw bytes (e. g. from a hardware device) data to an instance of a class
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="holonsoft.FluentConditions" Version="1.0.1.4" />
+    <PackageReference Include="holonsoft.FluentConditions" Version="1.0.1.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0" />
   </ItemGroup>
 
