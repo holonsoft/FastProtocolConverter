@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netcoreapp3.1;net472;net48;net5.0</TargetFrameworks>
+    <Company>holonsoft</Company>
+    <Authors>Alexander Bülow, Christian Vogt</Authors>
+    <Version>2.0.1</Version>
+    <Description>Reflection based fast protocol converter:
+Converts raw bytes (e. g. from a hardware device) data to an instance of a class or vice versa</Description>
+    <Copyright>holonsoft</Copyright>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/holonsoft/FastProtocolConverter</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/holonsoft/FastProtocolConverter</RepositoryUrl>
+    <RepositoryType>GIT</RepositoryType>
+    <PackageTags>#net4.7.2 #net4.8 #netcore3.1 #net5</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Enums\" />
+    <Folder Include="Delegates\" />
+    <Folder Include="Attributes\" />
+    <Folder Include="Exceptions\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>
