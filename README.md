@@ -12,6 +12,7 @@ It's free, opensource and licensed under <a href="https://opensource.org/license
 
 You simply define a POCO and add some attributes to the fields. The following example illustrates this 
 
+```c#
 
 	/// <summary>
     /// A simple protocol definition
@@ -53,12 +54,14 @@ You simply define a POCO and add some attributes to the fields. The following ex
         [ProtocolField(IgnoreField = true)]
         public string MyUnimportantField;
     }
-
+	
+```
 
 
 
 Of copurse you can define more complex protocols like
 
+```c#
 
 	public class ComplexProtocol
     {
@@ -124,7 +127,8 @@ Of copurse you can define more complex protocols like
 		[ProtocolField(IgnoreField = true)]
 		public bool Bit4;
 	}
-
+	
+```
 
 
 TBD
