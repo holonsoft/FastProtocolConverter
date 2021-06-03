@@ -91,17 +91,17 @@ As you can see, several events are provided.
 	[Flags]
 	public enum ConverterRangeViolationBehaviour
 	{
-	    None = 0x00,
+		None = 0x00,
 
 		/// <summary>
 		/// Ignore the range violation and continue
 		/// </summary>
-	    IgnoreAndContinue = 0x01,
+		IgnoreAndContinue = 0x01,
 
 		/// <summary>
 		/// Set to minimum value of type and continue
 		/// </summary>
-	    SetToMinValue = IgnoreAndContinue << 1,
+		SetToMinValue = IgnoreAndContinue << 1,
 
 		/// <summary>
 		/// Set to maximum value of type and continue
@@ -116,7 +116,7 @@ As you can see, several events are provided.
 		/// <summary>
 		/// Stop processing
 		/// </summary>
-	    ThrowException = IgnoreAndContinue << 4,
+		ThrowException = IgnoreAndContinue << 4,
 	}
 
 ``` 
@@ -235,9 +235,9 @@ Of course you can define more complex protocols like
 
 		// define only ONE field (1 bye in source byte array) to be parsed and call handler for splitting it
 		[ProtocolField(StartPos = -1, SequenceNo = 15, TypeInByteArray = DestinationType.Bits)]
-        public bool Bit0;
+		public bool Bit0;
 
-        [ProtocolField(IgnoreField = true)]
+		[ProtocolField(IgnoreField = true)]
 		public bool Bit2;
 
 		[ProtocolField(IgnoreField = true)]
