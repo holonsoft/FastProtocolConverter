@@ -3,8 +3,8 @@
 namespace holonsoft.FastProtocolConverter.Abstractions.Attributes
 {
     /// <summary>
-    /// Up to now (full 4.7.2 / core 3.1.1.) it's not possible to have generic attributes
-    /// Maybe C# 8 will implement this:
+    /// Up to now (full 4.7.2 / core 3.1.1. / net 5) it's not possible to have generic attributes
+    /// C# 8/9 will implement this:
     /// https://github.com/dotnet/roslyn/blob/master/docs/Language%20Feature%20Status.md
     /// At the moment we have to use the universal representation of all datatypes ... known as string :-)
     /// The type of range values will be determined by field the attribute is used for.

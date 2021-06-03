@@ -57,5 +57,16 @@ namespace holonsoft.FastProtocolConverter.Test.dto
 
         [ProtocolField(StartPos = -1, SequenceNo = 14)]
         public ushort UShortField;
-    }
+
+				// define only ONE field (1 bye in source byte array) to be parsed and call handler for splitting it
+				[ProtocolField(StartPos = -1, SequenceNo = 15, TypeInByteArray = DestinationType.Bits)]
+        public bool Bit0;
+
+        [ProtocolField(IgnoreField = true)]
+				public bool Bit2;
+
+				[ProtocolField(IgnoreField = true)]
+				public bool Bit4;
+	}
 }
+

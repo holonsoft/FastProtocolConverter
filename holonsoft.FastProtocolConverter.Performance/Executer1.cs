@@ -1,6 +1,7 @@
 ﻿// unset
 
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
 using holonsoft.FastProtocolConverter.Performance.dto;
 using System;
 using System.Collections.Generic;
@@ -21,7 +22,7 @@ namespace holonsoft.FastProtocolConverter.Performance
 
 			var pocoBytes = pocoByteList.ToArray();
 
-			var converter = new ProtocolConverter<A28BytesPocoForPerformanceTesting>(null);
+			var converter = new ProtocolConverter<A28BytesPocoForPerformanceTesting>(null) as IProtocolConverter<A28BytesPocoForPerformanceTesting>;
 			converter.Prepare();
 
 			// step 1 - convert once make sure that all works properly

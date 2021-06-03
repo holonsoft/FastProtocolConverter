@@ -10,37 +10,37 @@ namespace holonsoft.FastProtocolConverter.Test.dto
         public ulong TimeOfDetection;
 
         [ProtocolField(SequenceNo = 2, StartPos = -1)]
-        public double BearAzimuth;
+        public double MyDouble1;
 
         [ProtocolField(SequenceNo = 3, StartPos = -1)]
-        public double BearElevation;
+        public double MyDouble2;
 
         [ProtocolField(SequenceNo = 4, StartPos = -1)]
-        public double BearAzimuthError;
+        public double MyDouble3;
 
         [ProtocolField(SequenceNo = 5, StartPos = -1)]
-        public double BearElevationError;
+        public double MyDouble4;
 
         [ProtocolField(SequenceNo = 6, StartPos = -1)]
-        public double Confidence;
+        public double MyDouble5;
 
         [ProtocolField(SequenceNo = 7, StartPos = -1)]
-        public double LowerFrequency;
+        public double MyDouble6;
 
         [ProtocolField(SequenceNo = 8, StartPos = -1)]
-        public double UpperFrequency;
+        public double MyDouble7;
 
         [ProtocolField(SequenceNo = 9, StartPos = -1)]
-        public double SignalStrength;
+        public double MyDouble8;
 
         [ProtocolField(SequenceNo = 10, StartPos = -1)]
-        public double SignalNoiseRatio;
+        public double MyDouble9;
 
         [ProtocolField(SequenceNo = 11, TypeInByteArray = DestinationType.Byte, StartPos = -1)]
-        public ExamplePocoEnum RFSignalType;
+        public ExamplePocoEnum ExampleEnum1;
 
         [ProtocolField(SequenceNo = 12, TypeInByteArray = DestinationType.Byte, StartPos = -1)]
-        public ExamplePocoClassificationEnum RFSignalClassification;
+        public ExamplePocoClassificationEnum ExampleEnum2;
 
         [ProtocolField(SequenceNo = 13, StartPos = -1)]
         public byte ModelNameLength;

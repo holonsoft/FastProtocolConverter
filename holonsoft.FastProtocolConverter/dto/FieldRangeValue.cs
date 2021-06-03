@@ -1,8 +1,8 @@
-﻿using System;
-using holonsoft.FastProtocolConverter.Abstractions.Attributes;
+﻿using holonsoft.FastProtocolConverter.Abstractions.Attributes;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using System;
 
-namespace holonsoft.FastProtocolConverter
+namespace holonsoft.FastProtocolConverter.dto
 {
     public class FieldRangeValue<T>
         where T : IComparable<T>

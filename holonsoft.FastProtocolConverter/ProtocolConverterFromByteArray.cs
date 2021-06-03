@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.dto;
 using holonsoft.FluentConditions;
 
 namespace holonsoft.FastProtocolConverter
@@ -13,7 +14,7 @@ namespace holonsoft.FastProtocolConverter
         where T : class, new() 
     {
         
-        public T ConvertFromByteArray(byte[] data)
+        private T ConvertFromByteArray(byte[] data)
         {
             IsPrepared.Requires("Prepare()").IsTrue(); 
 
@@ -41,7 +42,7 @@ namespace holonsoft.FastProtocolConverter
         }
 
 
-        public void ConvertFromByteArray(byte[] data, T instance)
+        private void ConvertFromByteArray(byte[] data, T instance)
         {
             IsPrepared.Requires("Prepare()").IsTrue();
 
@@ -82,7 +83,7 @@ namespace holonsoft.FastProtocolConverter
                 }
 
 
-                if (kvp.Value.IsString)
+								if (kvp.Value.IsString)
                 {
                     var length = ReadLengthFieldValue(result, kvp.Value);
 
@@ -102,11 +103,12 @@ namespace holonsoft.FastProtocolConverter
 
                     kvp.Value.FieldInfo.SetValue(result, dataStr);
                     actualPosition += length;
+
+                    continue;
                 }
-                else
-                {
-                    actualPosition += SetFieldValue(result, kvp, actualPosition, data);
-                }
+
+								actualPosition += SetFieldValue(result, kvp, actualPosition, data);
+                
             }
         }
 
@@ -141,9 +143,15 @@ namespace holonsoft.FastProtocolConverter
         {
             var pos = position == -1 ? kvp.Key + _globalOffsetInByteArray : position;
 
-            //var field = kvp.Value.FieldInfo;
 
-            var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
+						if (kvp.Value.IsBitValue)
+						{
+							  OnSplitBitValues?.Invoke(data[pos], result);
+							  return 1;
+						}
+
+
+						var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
 
             switch (fieldTypeCode)
             {
@@ -166,8 +174,7 @@ namespace holonsoft.FastProtocolConverter
                     return SetFieldHandleUInt64Values(result, kvp, data, pos);
 
                 case TypeCode.Byte:
-                    //field.SetValue(result, data[pos]);
-                    kvp.Value.Setter(result, data[pos]);
+	                  kvp.Value.Setter(result, data[pos]);
                     return 1;
 
                 case TypeCode.Single:

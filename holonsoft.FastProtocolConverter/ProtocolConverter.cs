@@ -7,6 +7,8 @@ using holonsoft.FluentConditions;
 using holonsoft.FastProtocolConverter.Abstractions.Attributes;
 using holonsoft.FastProtocolConverter.Abstractions.Delegates;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
+using holonsoft.FastProtocolConverter.dto;
 
 
 namespace holonsoft.FastProtocolConverter
@@ -35,13 +37,16 @@ namespace holonsoft.FastProtocolConverter
 
         public OnRangeViolationDelegate OnRangeViolation { get; set; }
 
+				public OnSplitBitValuesDelegate<T> OnSplitBitValues { get; set; }
+				
+				public OnConsolidateBitValuesDelegate<T> OnConsolidateBitValues { get; set; }
 
-        public ProtocolConverter(ILogger logger)
+				public ProtocolConverter(ILogger logger)
         {
             _logger = logger;
         }
 
-        public void Prepare()
+        private void Prepare()
         {
             IsPrepared.Requires(nameof(IsPrepared)).IsFalse(); 
             

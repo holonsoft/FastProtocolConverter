@@ -5,6 +5,7 @@ using System.Text;
 using holonsoft.FluentConditions;
 using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.dto;
 
 
 namespace holonsoft.FastProtocolConverter
@@ -12,7 +13,7 @@ namespace holonsoft.FastProtocolConverter
     public partial class ProtocolConverter<T>
         where T : class, new()
     {
-        public byte[] ConvertToByteArray(T data)
+        private byte[] ConvertToByteArray(T data)
         {
             IsPrepared.Requires("Prepare()").IsTrue();
             data.Requires(nameof(data)).IsNotNull();
@@ -38,6 +39,7 @@ namespace holonsoft.FastProtocolConverter
 
             return result.ToArray();
         }
+
 
         private void CalculateStringForWriting(T data)
         {
@@ -153,6 +155,16 @@ namespace holonsoft.FastProtocolConverter
 
                 return;
             }
+
+            if (kvp.Value.IsBitValue)
+            {
+	            byte consolidatedBits = 0;
+							OnConsolidateBitValues?.Invoke(data, out consolidatedBits);
+							
+							result.Add(consolidatedBits);
+							return;
+            }
+
 
             switch (fieldTypeCode)
             {

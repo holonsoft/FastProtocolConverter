@@ -1,4 +1,5 @@
 ﻿using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.dto;
 using Xunit;
 
 namespace holonsoft.FastProtocolConverter.Test

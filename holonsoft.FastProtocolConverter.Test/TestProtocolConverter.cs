@@ -1,5 +1,6 @@
 ﻿using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
 using holonsoft.FastProtocolConverter.Test.dto;
 using Microsoft.Extensions.Logging;
 using System;
@@ -19,7 +20,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestMissingPrepareCall()
 		{
-			var converter = new ProtocolConverter<DumbPoco>(_logger);
+			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>;
 
 			Assert.Throws<ArgumentOutOfRangeException>(() => converter.ConvertFromByteArray(new byte[10]));
 		}
@@ -28,7 +29,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestArgumentDetection()
 		{
-			var converter = new ProtocolConverter<DumbPoco>(_logger);
+			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>; 
 
 			converter.Prepare();
 		}
@@ -36,7 +37,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestOverlappingFieldsException()
 		{
-			var converter = new ProtocolConverter<DumbPocoOverlappingFields>(_logger);
+			var converter = new ProtocolConverter<DumbPocoOverlappingFields>(_logger) as IProtocolConverter<DumbPocoOverlappingFields>;
 
 			Assert.Throws<ProtocolConverterException>(() => converter.Prepare());
 		}
@@ -44,7 +45,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestDoublePositionException()
 		{
-			var converter = new ProtocolConverter<DumbPocoDoublePositionFields>(_logger);
+			var converter = new ProtocolConverter<DumbPocoDoublePositionFields>(_logger) as IProtocolConverter<DumbPocoDoublePositionFields>; 
 
 			Assert.Throws<ProtocolConverterException>(() => converter.Prepare());
 		}
@@ -53,7 +54,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestConvertFromByteArray()
 		{
-			var converter = new ProtocolConverter<DumbPoco>(_logger);
+			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>; 
 			converter.Prepare();
 
 			var byteList = new List<byte>();
@@ -138,7 +139,7 @@ namespace holonsoft.FastProtocolConverter.Test
 				UShortField = 4711,
 			};
 
-			var converter = new ProtocolConverter<DumbPoco>(_logger);
+			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>;
 			converter.Prepare();
 
 			var resultByteArray = converter.ConvertToByteArray(myInstance);
@@ -177,7 +178,7 @@ namespace holonsoft.FastProtocolConverter.Test
 			byteList.AddRange(BitConverter.GetBytes(true));
 			byteList.AddRange(BitConverter.GetBytes(false));
 
-			var converter = new ProtocolConverter<ComplexProtocolWithOffset>(_logger);
+			var converter = new ProtocolConverter<ComplexProtocolWithOffset>(_logger) as IProtocolConverter<ComplexProtocolWithOffset>;
 			converter.Prepare();
 
 			var myInstance = converter.ConvertFromByteArray(byteList.ToArray());
@@ -248,7 +249,7 @@ namespace holonsoft.FastProtocolConverter.Test
 				FalseField = false,
 			};
 
-			var converter = new ProtocolConverter<ComplexProtocolWithOffset>(_logger);
+			var converter = new ProtocolConverter<ComplexProtocolWithOffset>(_logger) as IProtocolConverter<ComplexProtocolWithOffset>;
 			converter.Prepare();
 
 			var resultByteArray = converter.ConvertToByteArray(myInstance);
@@ -276,13 +277,53 @@ namespace holonsoft.FastProtocolConverter.Test
 				DoubleField = Math.PI,
 				UIntField = 4812,
 				UShortField = 4711,
+				Bit0 = true,
+				Bit2 = true,
+				Bit4 = true,
 			};
 
 
-			var converter = new ProtocolConverter<ComplexProtocol>(_logger);
+			var converter = new ProtocolConverter<ComplexProtocol>(_logger) as IProtocolConverter<ComplexProtocol>;
 			converter.Prepare();
+			converter.OnSplitBitValues += (data, instance) =>
+			{
+				instance.Bit0 = (data & 0b0000_0001) > 0;
+				instance.Bit2 = (data & 0b0000_0100) > 0;
+				instance.Bit4 = (data & 0b0001_0000) > 0;
+			};
+
+
+			converter.OnConsolidateBitValues += (ComplexProtocol instance, out byte data) =>
+			{
+				data = 0;
+
+				if (instance.Bit0)
+				{
+					data |= 0b0000_0001;
+				}
+
+				if (instance.Bit2)
+				{
+					data |= 0b0000_0100;
+				}
+
+				if (instance.Bit4)
+				{
+					data |= 0b0001_0000;
+				}
+			};
+
 
 			var byteArrayResult = converter.ConvertToByteArray(myInstance);
+
+#if NET   // C#8 and higher  
+			Assert.Equal(21, (int)byteArrayResult[^1]);
+#else
+			// ReSharper disable once UseIndexFromEndExpression
+			Assert.Equal(21, (int) byteArrayResult[byteArrayResult.Length - 1]);
+#endif
+
+
 			var newInstance = converter.ConvertFromByteArray(byteArrayResult);
 
 			Assert.Equal(myInstance.IntField, newInstance.IntField);
@@ -310,7 +351,7 @@ namespace holonsoft.FastProtocolConverter.Test
 				StrField2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
 			};
 
-			var converter = new ProtocolConverter<ComplexProtocolFixedStringLength>(_logger);
+			var converter = new ProtocolConverter<ComplexProtocolFixedStringLength>(_logger) as IProtocolConverter<ComplexProtocolFixedStringLength>;
 			converter.Prepare();
 
 			var byteArrayResult = converter.ConvertToByteArray(myInstance);
@@ -343,27 +384,27 @@ namespace holonsoft.FastProtocolConverter.Test
 			var payload = new ExamplePocoPayloadMsgType01()
 			{
 				TimeOfDetection = timestamp,
-				BearAzimuth = 1 + variance,
-				BearElevation = -90 + variance,
-				BearAzimuthError = 270 + variance,
-				BearElevationError = 90 - variance,
-				Confidence = variance / 10,
-				LowerFrequency = Math.PI,
-				UpperFrequency = Math.PI,
-				SignalStrength = Math.E,
-				SignalNoiseRatio = variance ^ 2,
-				RFSignalType = ExamplePocoEnum.ShutdownByOutlaw,
-				RFSignalClassification = ExamplePocoClassificationEnum.FlyingSpaghettiMonster,
+				MyDouble1 = 1 + variance,
+				MyDouble2 = -90 + variance,
+				MyDouble3 = 270 + variance,
+				MyDouble4 = 90 - variance,
+				MyDouble5 = variance / 10,
+				MyDouble6 = Math.PI,
+				MyDouble7 = Math.PI,
+				MyDouble8 = Math.E,
+				MyDouble9 = variance ^ 2,
+				ExampleEnum1 = ExamplePocoEnum.ShutdownByOutlaw,
+				ExampleEnum2 = ExamplePocoClassificationEnum.FlyingSpaghettiMonster,
 				ModelName = "Model No" + variance,
 				SourceId = "Source is " + variance,
 				DetectionId = "Detection Id " + variance,
 			};
 
 
-			var headerConverter = new ProtocolConverter<ExamplePocoHeader>(_logger);
+			var headerConverter = new ProtocolConverter<ExamplePocoHeader>(_logger) as IProtocolConverter<ExamplePocoHeader>;
 			headerConverter.Prepare();
 
-			var payloadConverter = new ProtocolConverter<ExamplePocoPayloadMsgType01>(_logger);
+			var payloadConverter = new ProtocolConverter<ExamplePocoPayloadMsgType01>(_logger) as IProtocolConverter<ExamplePocoPayloadMsgType01>;
 			payloadConverter.Prepare();
 
 
@@ -386,17 +427,17 @@ namespace holonsoft.FastProtocolConverter.Test
 
 			var resultPayload = payloadConverter.ConvertFromByteArray(data);
 
-			Assert.Equal(payload.BearAzimuth, resultPayload.BearAzimuth);
-			Assert.Equal(payload.BearAzimuthError, resultPayload.BearAzimuthError);
-			Assert.Equal(payload.BearElevation, resultPayload.BearElevation);
-			Assert.Equal(payload.BearElevationError, resultPayload.BearElevationError);
-			Assert.Equal(payload.Confidence, resultPayload.Confidence);
-			Assert.Equal(payload.LowerFrequency, resultPayload.LowerFrequency);
-			Assert.Equal(payload.UpperFrequency, resultPayload.UpperFrequency);
-			Assert.Equal(payload.SignalStrength, resultPayload.SignalStrength);
-			Assert.Equal(payload.SignalNoiseRatio, resultPayload.SignalNoiseRatio);
-			Assert.Equal(payload.RFSignalType, resultPayload.RFSignalType);
-			Assert.Equal(payload.RFSignalClassification, resultPayload.RFSignalClassification);
+			Assert.Equal(payload.MyDouble1, resultPayload.MyDouble1);
+			Assert.Equal(payload.MyDouble3, resultPayload.MyDouble3);
+			Assert.Equal(payload.MyDouble2, resultPayload.MyDouble2);
+			Assert.Equal(payload.MyDouble4, resultPayload.MyDouble4);
+			Assert.Equal(payload.MyDouble5, resultPayload.MyDouble5);
+			Assert.Equal(payload.MyDouble6, resultPayload.MyDouble6);
+			Assert.Equal(payload.MyDouble7, resultPayload.MyDouble7);
+			Assert.Equal(payload.MyDouble8, resultPayload.MyDouble8);
+			Assert.Equal(payload.MyDouble9, resultPayload.MyDouble9);
+			Assert.Equal(payload.ExampleEnum1, resultPayload.ExampleEnum1);
+			Assert.Equal(payload.ExampleEnum2, resultPayload.ExampleEnum2);
 			Assert.Equal(payload.ModelName, resultPayload.ModelName);
 			Assert.Equal(payload.DetectionId, resultPayload.DetectionId);
 			Assert.Equal(payload.SourceId, resultPayload.SourceId);
@@ -430,10 +471,10 @@ namespace holonsoft.FastProtocolConverter.Test
 				ULongField = ulong.MaxValue,
 			};
 
-			var convNoEndianess = new ProtocolConverter<PocoNoBigEndianessFlag>(_logger);
+			var convNoEndianess = new ProtocolConverter<PocoNoBigEndianessFlag>(_logger) as IProtocolConverter<PocoNoBigEndianessFlag>;
 			convNoEndianess.Prepare();
 
-			var convWithEndianess = new ProtocolConverter<PocoWithBigEndianessFlag>(_logger);
+			var convWithEndianess = new ProtocolConverter<PocoWithBigEndianessFlag>(_logger) as IProtocolConverter<PocoWithBigEndianessFlag>;
 			convWithEndianess.Prepare();
 
 			var s1 = convNoEndianess.ConvertToByteArray(noEndianessSource);
@@ -526,7 +567,7 @@ namespace holonsoft.FastProtocolConverter.Test
 				IntField = 4200
 			};
 
-			var converter = new ProtocolConverter<PocoWithRanges>(_logger);
+			var converter = new ProtocolConverter<PocoWithRanges>(_logger) as IProtocolConverter<PocoWithRanges>;
 			converter.Prepare();
 
 			var resultArray = converter.ConvertToByteArray(r);

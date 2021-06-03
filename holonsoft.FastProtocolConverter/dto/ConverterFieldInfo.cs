@@ -1,12 +1,12 @@
-﻿using System;
+﻿using holonsoft.FastProtocolConverter.Abstractions.Attributes;
+using holonsoft.FastProtocolConverter.Abstractions.Enums;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using holonsoft.FastProtocolConverter.Abstractions.Attributes;
 
-
-namespace holonsoft.FastProtocolConverter
+namespace holonsoft.FastProtocolConverter.dto
 {
     /// <summary>
     /// contains infos per field in POCO
@@ -37,6 +37,11 @@ namespace holonsoft.FastProtocolConverter
         /// shortcut flag to indicate whether field type is string
         /// </summary>
         public bool IsEnum { get; }
+
+				/// <summary>
+				/// Shortcut flag to indicate that the byte should be treated as several bit values
+				/// </summary>
+				public bool IsBitValue { get; }
 
         /// <summary>
         /// Underlying field
@@ -82,6 +87,8 @@ namespace holonsoft.FastProtocolConverter
 
             IsString = FieldInfo.FieldType == typeof(string);
             IsEnum = FieldInfo.FieldType.IsEnum;
+            IsBitValue = Attribute.TypeInByteArray == DestinationType.Bits;
+
 
             ExpectedFieldSize = IsString || IsEnum? -1 : Marshal.SizeOf(FieldInfo.FieldType);
 
