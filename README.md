@@ -13,10 +13,12 @@ It's free, opensource and licensed under <a href="https://opensource.org/license
 You simply define a POCO and add some attributes to the fields. The following example illustrates this 
 
 ```c#
+
 	var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>;
 ```
 
-This creates a converter, cast it to the appropriate interface and that's it.
+This creates a converter and cast it to the appropriate interface.
+After that you call `Prepare()`, this will inspect the attributes and feed the internal logic.
 
 The interface itself it pretty easy and straight forward to use. We use Microsoft.Logging.Abstractions as a generic logger interface. All important logging frameworks provide an adapter for it, so please feel free to use a logger of your choice.
 
@@ -91,41 +93,41 @@ As you can see, several events are provided.
 	{
 	    None = 0x00,
 
-			/// <summary>
-			/// Ignore the range violation and continue
-			/// </summary>
+		/// <summary>
+		/// Ignore the range violation and continue
+		/// </summary>
 	    IgnoreAndContinue = 0x01,
 
-			/// <summary>
-			/// Set to minimum value of type and continue
-			/// </summary>
+		/// <summary>
+		/// Set to minimum value of type and continue
+		/// </summary>
 	    SetToMinValue = IgnoreAndContinue << 1,
 
-			/// <summary>
-			/// Set to maximum value of type and continue
-			/// </summary>
-			SetToMaxValue = IgnoreAndContinue << 2,
+		/// <summary>
+		/// Set to maximum value of type and continue
+		/// </summary>
+		SetToMaxValue = IgnoreAndContinue << 2,
 
-			/// <summary>
-			/// Set to default value of type and continue
-			/// </summary>
-			SetToDefaultValue = IgnoreAndContinue << 3,
+		/// <summary>
+		/// Set to default value of type and continue
+		/// </summary>
+		SetToDefaultValue = IgnoreAndContinue << 3,
 
-			/// <summary>
-			/// Stop processing
-			/// </summary>
+		/// <summary>
+		/// Stop processing
+		/// </summary>
 	    ThrowException = IgnoreAndContinue << 4,
 	}
 
 ``` 
 
-1. OnSplitBitValues
+2. `OnSplitBitValues` occurs if a field is marked as 'BITS'. You can assign the 8 bits of this special byte to appropriate fields in your POCO
 
+3. `OnConsolidateBitValues` occurs if a field is marked as 'BITS'. You can assign the 8 bits of this special byte from appropriate fields in your POCO
 
+Please note that only one field is marked as "BITS" and all other data holder fields should be marked as to be skipped: `[ProtocolField(IgnoreField = true)]`
 
-1. OnConsolidateBitValues
-
-
+With `[ProtocolSetupArgument(OffsetInByteArray = <number_of_bytes>)]` the converter skips n bytes at the beginning. This is helpful if you do not want to assign this bytes to some fields in your POCO.
 
 ```c#
 
@@ -173,8 +175,7 @@ As you can see, several events are provided.
 ```
 
 
-
-Of copurse you can define more complex protocols like
+Of course you can define more complex protocols like
 
 ```c#
 
@@ -246,4 +247,4 @@ Of copurse you can define more complex protocols like
 ```
 
 
-TBD
+
