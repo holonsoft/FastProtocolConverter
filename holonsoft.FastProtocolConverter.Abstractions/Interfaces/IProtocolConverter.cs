@@ -52,6 +52,5 @@ namespace holonsoft.FastProtocolConverter.Abstractions.Interfaces
 		/// Will be triggered if a byte value is marked as "BITS"
 		/// </summary>
 		event OnConsolidateBitValuesDelegate<T> OnConsolidateBitValues;
-
-  }
+	}
 }

@@ -5,8 +5,7 @@ At a glance
 Support for
 * uint16|32|64, int16|32|64, decimal, single, double, byte, sbyte 
 * Guid, DateTime, Boolean, Enums, IPAddress, strings
-* int[], string[], bool[]
-
+* Support for endianess
 
 It's free, opensource and licensed under <a href="https://opensource.org/licenses/Apache-2.0">APACHE 2.0</a> (an OSI approved license).
 
@@ -246,5 +245,101 @@ Of course you can define more complex protocols like
 	
 ```
 
+There are two kinds of protocol:
+
+1. simple, you just define a `StartPos` (positon in byte array) per field and that's it.
+1. complex, in this case you could not define `StartPos` but have to use SequenceNo instead. 
 
 
+
+Several type mappings are supported, e. g. you map your `enum` to 16bit in byte array (and vice versa)
+
+	[ProtocolField(StartPos = 11, TypeInByteArray = DestinationType.Int16)]
+    public MyImportantEnum EnumField2;
+
+
+Strings have a special treatment, you can convert from ASCI to UNICODE and vice versa. Please note, that length field for a string must have a lower sequence number.
+
+	[ProtocolField(StartPos = -1, SequenceNo = 4)]
+	[ProtocolStringField(LengthFieldName = "LengthOfStr2")]
+	public string String2;
+
+This defines a string field, in the byte array the `LengthOfStr2` has the length of it.
+
+A more complex example for handling string is here
+
+```c#
+
+	public class ComplexProtocolFixedStringLength
+    {
+		[ProtocolField(StartPos = 0, SequenceNo = 1)]
+		public int LengthOfStr1;
+
+		[ProtocolField(StartPos = -1, SequenceNo = 2)]
+		public int LengthOfStr2;
+
+		// will be filled to 10 chars (ascii)
+		[ProtocolField(StartPos = -1, SequenceNo = 3)]
+		[ProtocolStringField(LengthFieldName = "LengthOfStr1", FillupCharWhenShorter = 'Z', StringMaxLengthInByteArray = 10, Encoder = SupportedEncoder.ASCIIEncoder)]
+		public string StrField1;
+
+		// will be shortened to 10 chars (ascii)
+		[ProtocolField(StartPos = -1, SequenceNo = 4)]
+		[ProtocolStringField(LengthFieldName = "LengthOfStr2", StringMaxLengthInByteArray = 10, Encoder = SupportedEncoder.ASCIIEncoder)]
+		public string StrField2;
+    }
+
+```
+
+
+Endianess can be achied by decoration the class
+
+```c#
+
+	[ProtocolSetupArgument(UseBigEndian = false)] 
+    public class PocoNoBigEndianessFlag
+
+
+	[ProtocolSetupArgument(UseBigEndian = true)] 
+    public class PocoWithBigEndianessFlag
+
+```
+
+
+As mentioned before ranges for several field types are supported
+
+```c#
+
+public class PocoWithRanges
+    {
+        [ProtocolField(StartPos = 0)]
+        [ProtocolFieldRange(MinValue = "-2200", MaxValue = "-1200", DefaultValue = "-2000")]
+        public int IntField;
+
+        [ProtocolField(StartPos = 4)]
+        [ProtocolFieldRange(MinValue = "1100", MaxValue = "2200")]
+        public uint UIntField;
+
+        [ProtocolField(StartPos = 8)]
+        [ProtocolFieldRange(MinValue = "1100", MaxValue = "2200")]
+        public short ShortField;
+
+        [ProtocolField(StartPos = 10)]
+        [ProtocolFieldRange(MinValue = "1100", MaxValue = "2200")]
+        public ushort UShortField;
+
+        [ProtocolField(StartPos = 12)]
+        [ProtocolFieldRange(MinValue = "1.100", MaxValue = "2.200")]
+        public float FloatField;
+
+        [ProtocolField(StartPos = 16)]
+        [ProtocolFieldRange(MinValue = "3.1415", MaxValue = "6.282")]
+        public double DoubleField;
+
+    }
+
+
+```
+
+
+We hope this software is helpful for your project. Do not hesiate to contact us and ask for new features or report a bug.
