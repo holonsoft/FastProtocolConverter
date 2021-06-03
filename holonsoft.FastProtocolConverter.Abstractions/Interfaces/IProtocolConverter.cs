@@ -8,7 +8,7 @@ namespace holonsoft.FastProtocolConverter.Abstractions.Interfaces
 	/// <typeparam name="T">T is the source/destination POCO type, restrictions: must be a class and new()</typeparam>
 	public interface IProtocolConverter<T>
 		where T : class, new()
-  {
+    {
 		/// <summary>
 		/// Prepare the parser / converter, analyse the POCO vioa reflection
 		/// This can only be called once per converter

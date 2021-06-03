@@ -13,6 +13,121 @@ It's free, opensource and licensed under <a href="https://opensource.org/license
 You simply define a POCO and add some attributes to the fields. The following example illustrates this 
 
 ```c#
+	var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>;
+```
+
+This creates a converter, cast it to the appropriate interface and that's it.
+
+The interface itself it pretty easy and straight forward to use. We use Microsoft.Logging.Abstractions as a generic logger interface. All important logging frameworks provide an adapter for it, so please feel free to use a logger of your choice.
+
+
+```c#
+
+	/// <summary>
+	/// Provides the public part of the converter
+	/// </summary>
+	/// <typeparam name="T">T is the source/destination POCO type, restrictions: must be a class and new()</typeparam>
+	public interface IProtocolConverter<T>
+		where T : class, new()
+    {
+		/// <summary>
+		/// Prepare the parser / converter, analyse the POCO vioa reflection
+		/// This can only be called once per converter
+		/// </summary>
+		void Prepare();
+
+		/// <summary>
+		/// Use a source array to fill the content of POCO
+		/// Creates every time a new instance of POCO
+		/// </summary>
+		/// <param name="data">byte array with raw values</param>
+		/// <returns>An instance of POCO</returns>
+		T ConvertFromByteArray(byte[] data);
+
+
+		/// <summary>
+		/// Use a source array to fill the content of POCO
+		/// </summary>
+		/// <param name="data">byte array with raw values</param>
+		/// <param name="instance">an outside created, reusable instance of a POCO</param>
+		void ConvertFromByteArray(byte[] data, T instance);
+
+		/// <summary>
+		/// Converts a POCO content to a byte array
+		/// </summary>
+		/// <param name="data">POCO instance</param>
+		/// <returns>the byte array</returns>
+		byte[] ConvertToByteArray(T data);
+
+		/// <summary>
+		/// An event that will be fired in case of range violations of a field
+		/// </summary>
+		event OnRangeViolationDelegate OnRangeViolation;
+
+		/// <summary>
+		/// Will be triggered if a byte value in source data is marked as "BITS"
+		/// </summary>
+		event OnSplitBitValuesDelegate<T> OnSplitBitValues;
+
+		/// <summary>
+		/// Will be triggered if a byte value is marked as "BITS"
+		/// </summary>
+		event OnConsolidateBitValuesDelegate<T> OnConsolidateBitValues;
+	}
+	
+```
+
+As you can see, several events are provided. 
+
+1.  `OnRangeViolation` occurs if a numercic field has defined an range and this range is violated. You can decide on the fly how to handle the value. Supported are 
+
+```c#
+
+/// <summary>
+	/// Define the behaviour when a range violation occurs 
+	/// </summary>
+	[Flags]
+	public enum ConverterRangeViolationBehaviour
+	{
+	    None = 0x00,
+
+			/// <summary>
+			/// Ignore the range violation and continue
+			/// </summary>
+	    IgnoreAndContinue = 0x01,
+
+			/// <summary>
+			/// Set to minimum value of type and continue
+			/// </summary>
+	    SetToMinValue = IgnoreAndContinue << 1,
+
+			/// <summary>
+			/// Set to maximum value of type and continue
+			/// </summary>
+			SetToMaxValue = IgnoreAndContinue << 2,
+
+			/// <summary>
+			/// Set to default value of type and continue
+			/// </summary>
+			SetToDefaultValue = IgnoreAndContinue << 3,
+
+			/// <summary>
+			/// Stop processing
+			/// </summary>
+	    ThrowException = IgnoreAndContinue << 4,
+	}
+
+``` 
+
+1. OnSplitBitValues
+
+
+
+1. OnConsolidateBitValues
+
+
+
+```c#
 
 	/// <summary>
     /// A simple protocol definition
