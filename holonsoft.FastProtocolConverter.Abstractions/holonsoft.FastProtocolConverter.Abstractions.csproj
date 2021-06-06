@@ -4,7 +4,7 @@
     <TargetFrameworks>netcoreapp3.1;net472;net48;net5.0</TargetFrameworks>
     <Company>holonsoft</Company>
     <Authors>Alexander Bülow, Christian Vogt</Authors>
-    <Version>2.1.1</Version>
+    <Version>2.3.1</Version>
     <Description>Reflection based fast protocol converter:
 Converts raw bytes (e. g. from a hardware device) data to an instance of a class or vice versa</Description>
     <Copyright>holonsoft</Copyright>
@@ -17,8 +17,6 @@ Converts raw bytes (e. g. from a hardware device) data to an instance of a class
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Enums\" />
-    <Folder Include="Attributes\" />
     <Folder Include="Exceptions\" />
   </ItemGroup>
 

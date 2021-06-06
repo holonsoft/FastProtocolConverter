@@ -29,10 +29,5 @@ namespace holonsoft.FastProtocolConverter.Abstractions.Attributes
 		/// Used if destination type in array is different, supported only for enums
 		/// </summary>
 		public DestinationType TypeInByteArray { get; set; }
-
-		/// <summary>
-		/// Used to define bit position if a single BYTE has to be splitted into several bool values
-		/// </summary>
-		public ushort BitPosition { get; set; }
 	}
 }

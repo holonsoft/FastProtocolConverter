@@ -591,7 +591,6 @@ namespace holonsoft.FastProtocolConverter.Test
 			rr = converter.ConvertFromByteArray(resultArray);
 			Assert.Equal(-1200, rr.IntField);
 
-
 			converter.OnRangeViolation -= OnRangeViolationSetToMaxVal;
 			converter.OnRangeViolation += OnRangeViolationSetToDefaultVal;
 			rr = converter.ConvertFromByteArray(resultArray);
@@ -600,6 +599,31 @@ namespace holonsoft.FastProtocolConverter.Test
 			converter.OnRangeViolation -= OnRangeViolationSetToMaxVal;
 			converter.OnRangeViolation += OnRangeViolationStop;
 			Assert.Throws<ProtocolConverterException>(() => converter.ConvertFromByteArray(resultArray));
+		}
+
+
+		[Fact]
+		public void TestAdvancedTypesPoco()
+		{
+			var converter = new ProtocolConverter<AdvancedTypesPoco>(_logger) as IProtocolConverter<AdvancedTypesPoco>;
+			converter.Prepare();
+
+			var r = new AdvancedTypesPoco()
+			{
+				DateTimeField = new DateTime(2021, 06, 01, 13, 14, 15).ToUniversalTime(), 
+				GuidField = Guid.NewGuid(),
+			};
+			
+			var resultArray = converter.ConvertToByteArray(r);
+
+			Assert.Equal(37, resultArray.Length);
+
+			var rr = converter.ConvertFromByteArray(resultArray);
+
+			Assert.Equal(r.Padding, rr.Padding);
+			Assert.Equal(r.DateTimeField, rr.DateTimeField);
+			Assert.Equal(r.GuidField, rr.GuidField);
+
 		}
 
 
@@ -630,5 +654,6 @@ namespace holonsoft.FastProtocolConverter.Test
 		{
 			rangeViolationBehaviour = ConverterRangeViolationBehaviour.ThrowException;
 		}
+
 	}
 }
