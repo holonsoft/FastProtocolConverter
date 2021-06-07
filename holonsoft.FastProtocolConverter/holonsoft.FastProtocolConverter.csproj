@@ -8,7 +8,7 @@
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageProjectUrl>https://github.com/holonsoft/FastProtocolConverter</PackageProjectUrl>
     <RepositoryUrl>https://github.com/holonsoft/FastProtocolConverter</RepositoryUrl>
-    <Version>2.3.1</Version>
+    <Version>2.3.3</Version>
     <Description>Reflection based fast protocol converter:
 Converts raw bytes (e. g. from a hardware device) data to an instance of a class or vice versa</Description>
     <RepositoryType>GIT</RepositoryType>

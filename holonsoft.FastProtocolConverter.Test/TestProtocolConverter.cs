@@ -627,6 +627,28 @@ namespace holonsoft.FastProtocolConverter.Test
 		}
 
 
+		[Fact]
+		public void TestSimplePocoWithGap()
+		{
+			var converter = new ProtocolConverter<SimplePocoWithGap>(_logger) as IProtocolConverter<SimplePocoWithGap>;
+			converter.Prepare();
+
+			var r = new SimplePocoWithGap()
+			{
+				JobNumberIn = 4711, 
+				MachineMode = PLCMachineMode.B, 
+				Request = true, 
+				Start = true,
+			};
+
+			var resultArray = converter.ConvertToByteArray(r);
+			Assert.Equal(1128, resultArray.Length);
+
+			var rr = converter.ConvertFromByteArray(resultArray);
+
+		}
+
+
 		private void OnRangeViolationSetToDefaultVal(FieldInfo FieldInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
 		{
 			rangeViolationBehaviour = ConverterRangeViolationBehaviour.SetToDefaultValue;

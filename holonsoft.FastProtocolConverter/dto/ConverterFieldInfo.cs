@@ -155,6 +155,38 @@ namespace holonsoft.FastProtocolConverter.dto
 			{
 				ExpectedFieldSize = IsString || IsEnum ? -1 : Marshal.SizeOf(FieldInfo.FieldType);
 			}
+			
+			if (FieldInfo.FieldType == typeof(bool))
+			{
+				ExpectedFieldSize = 1;
+			}
+
+			if (IsEnum)
+			{
+				switch (Attribute.TypeInByteArray)
+				{
+					case DestinationType.Byte:
+						ExpectedFieldSize = 1;
+						break;
+					case DestinationType.Default:
+						break;
+					case DestinationType.Int16:
+					case DestinationType.UInt16:
+						ExpectedFieldSize = 2;
+						break;
+					case DestinationType.Int32:
+					case DestinationType.UInt32:
+						ExpectedFieldSize = 4;
+						break;
+					case DestinationType.Int64:
+					case DestinationType.UInt64:
+						ExpectedFieldSize = 8;
+						break;
+					default:
+						throw new ArgumentOutOfRangeException($"the cohosen enum TypeInByteArray is not supported for {FieldName}" );
+				}
+			}
+
 
 			if (IsString)
 			{

@@ -80,7 +80,7 @@ namespace holonsoft.FastProtocolConverter
 
                 if ((info.Attribute.StartPos > -1) && (_fieldListFixPos.ContainsKey(info.Attribute.StartPos)))
                 {
-                    var msg = $"Fields '{_fieldListFixPos[info.Attribute.StartPos].FieldName}' and '{info.FieldName}' have the same position in byte array defintion, that's not possible";
+                    var msg = $"Fields '{_fieldListFixPos[info.Attribute.StartPos].FieldName}' and '{info.FieldName}' have the same position in byte array definition, that's not possible";
                     _logger?.Log(LogLevel.Critical, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} {msg}");
 
                     throw new ProtocolConverterException(msg);
@@ -126,6 +126,7 @@ namespace holonsoft.FastProtocolConverter
                 _totalMinLength = nextPosition;
             }
 
+            _totalMinLength -= 1;
 
             if (_fieldListSeqPos.Count == 0)
             {
