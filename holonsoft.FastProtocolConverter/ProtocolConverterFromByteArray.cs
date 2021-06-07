@@ -87,7 +87,7 @@ namespace holonsoft.FastProtocolConverter
 
 				if (kvp.Value.IsString)
 				{
-					var length = ReadLengthFieldValue(result, kvp.Value);
+					var length = kvp.Value.StrAttribute.IsFixedLengthString? kvp.Value.StrAttribute.StringMaxLengthInByteArray : ReadLengthFieldValue(result, kvp.Value);
 
 					string dataStr;
 

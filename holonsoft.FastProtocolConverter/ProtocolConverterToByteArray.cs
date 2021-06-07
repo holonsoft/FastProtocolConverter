@@ -88,6 +88,8 @@ namespace holonsoft.FastProtocolConverter
 							kvp.Value.PartialBuffer.Count - kvp.Value.StrAttribute.StringMaxLengthInByteArray);
 						effectiveLength = kvp.Value.StrAttribute.StringMaxLengthInByteArray;
 					}
+
+					continue;
 				}
 
 				var correspondingLengthField = _fieldListByName[strAttr.LengthFieldName];

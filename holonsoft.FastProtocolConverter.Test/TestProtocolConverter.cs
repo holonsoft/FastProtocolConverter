@@ -1,8 +1,4 @@
-﻿using holonsoft.FastProtocolConverter.Abstractions.Enums;
-using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
-using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
-using holonsoft.FastProtocolConverter.Test.dto;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +6,10 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using Xunit;
+using holonsoft.FastProtocolConverter.Abstractions.Enums;
+using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
+using holonsoft.FastProtocolConverter.Test.dto;
 
 namespace holonsoft.FastProtocolConverter.Test
 {
@@ -355,7 +355,7 @@ namespace holonsoft.FastProtocolConverter.Test
 			converter.Prepare();
 
 			var byteArrayResult = converter.ConvertToByteArray(myInstance);
-			Assert.Equal(28, byteArrayResult.Length);
+			Assert.Equal(20, byteArrayResult.Length);
 
 			var newInstance = converter.ConvertFromByteArray(byteArrayResult);
 
