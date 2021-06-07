@@ -4,7 +4,7 @@ Converts raw bytes (e. g. from a hardware device) data to an instance of a class
 At a glance
 Support for
 * uint16|32|64, int16|32|64, decimal, single, double, byte, sbyte 
-* Guid, DateTime, Boolean, Enums, IPAddress, strings
+* Guid, DateTime, Boolean, Enums, strings
 * Support for endianess
 
 It's free, opensource and licensed under <a href="https://opensource.org/licenses/Apache-2.0">APACHE 2.0</a> (an OSI approved license).
