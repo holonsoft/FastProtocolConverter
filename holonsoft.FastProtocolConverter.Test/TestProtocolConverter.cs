@@ -646,6 +646,37 @@ namespace holonsoft.FastProtocolConverter.Test
 
 			var rr = converter.ConvertFromByteArray(resultArray);
 
+			Assert.Equal(r.JobNumberIn, rr.JobNumberIn);
+			Assert.Equal(r.MachineMode, rr.MachineMode);
+			Assert.Equal(r.Request, rr.Request);
+			Assert.Equal(r.Start, rr.Start);
+
+		}
+
+
+		[Fact]
+		public void TestSimplePocoWithGapAndString()
+		{
+			var converter = new ProtocolConverter<SimplePocoWithGapAndString>(_logger) as IProtocolConverter<SimplePocoWithGapAndString>;
+			converter.Prepare();
+
+			var r = new SimplePocoWithGapAndString()
+			{
+				JobId = 4711,
+				SomeImportantCode = "ABCDE",
+				IsRequest = true,
+				IsStart = true,
+			};
+
+			var resultArray = converter.ConvertToByteArray(r);
+			Assert.Equal(272, resultArray.Length);
+
+			var rr = converter.ConvertFromByteArray(resultArray);
+
+			Assert.Equal(r.JobId, rr.JobId);
+			Assert.Equal(r.IsRequest, rr.IsRequest);
+			Assert.Equal(r.IsStart, rr.IsStart);
+			Assert.Equal(r.SomeImportantCode, rr.SomeImportantCode);
 		}
 
 

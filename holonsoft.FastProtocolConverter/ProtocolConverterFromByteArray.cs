@@ -158,6 +158,43 @@ namespace holonsoft.FastProtocolConverter
 				return SetFieldHandleGuidValues(result, kvp, data, pos);
 			}
 
+			if (kvp.Value.IsString)
+			{
+				string dataStr;
+
+				switch (kvp.Value.StrAttribute.Encoder)
+				{
+					case SupportedEncoder.UnicodeEncoder:
+						dataStr = FromByteArrayToStringConverter(data, pos, kvp.Value.StrAttribute.StringMaxLengthInByteArray, Encoding.Unicode);
+						break;
+					case SupportedEncoder.None:
+					case SupportedEncoder.ASCIIEncoder: // is default
+					default:
+						dataStr = FromByteArrayToStringConverter(data, pos, kvp.Value.StrAttribute.StringMaxLengthInByteArray, Encoding.ASCII);
+						break;
+				}
+
+				if (kvp.Value.StrAttribute.IsFixedLengthString)
+				{
+					var i = dataStr.Length - 1;
+
+					while ((i >= 0) && (dataStr[i] == kvp.Value.StrAttribute.FillupCharWhenShorter))
+					{
+						i--;
+					}
+
+					if (i > -1)
+					{
+						dataStr = dataStr.Substring(0, i + 1);
+					}
+
+				}
+
+				kvp.Value.FieldInfo.SetValue(result, dataStr);
+				return kvp.Value.StrAttribute.StringMaxLengthInByteArray;
+			}
+
+
 			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
 
 			switch (fieldTypeCode)

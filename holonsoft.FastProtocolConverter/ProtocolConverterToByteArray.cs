@@ -7,6 +7,7 @@ using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
 using holonsoft.FastProtocolConverter.dto;
 using holonsoft.FluentDateTime.DateTime;
+using System.Runtime.CompilerServices;
 
 
 namespace holonsoft.FastProtocolConverter
@@ -49,84 +50,92 @@ namespace holonsoft.FastProtocolConverter
 			{
 				if (!kvp.Value.IsString) continue;
 
-				var converterFieldInfo = kvp.Value;
-				var strAttr = converterFieldInfo.StrAttribute;
-
-				kvp.Value.PartialBuffer.Clear();
-
-				byte[] fillupChar = null;
-
-				// encode str to destination byte array
-				switch (strAttr.Encoder)
-				{
-					case SupportedEncoder.None:
-					case SupportedEncoder.Default:
-						kvp.Value.PartialBuffer.AddRange(Encoding.ASCII.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
-						fillupChar = Encoding.ASCII.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
-						break;
-					case SupportedEncoder.UnicodeEncoder:
-						kvp.Value.PartialBuffer.AddRange(Encoding.Unicode.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
-						fillupChar = Encoding.Unicode.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
-						break;
-				}
-
-				int effectiveLength = kvp.Value.PartialBuffer.Count;
-
-				if (strAttr.IsFixedLengthString)
-				{
-					if (effectiveLength < kvp.Value.StrAttribute.StringMaxLengthInByteArray)
-					{
-						while (effectiveLength < kvp.Value.StrAttribute.StringMaxLengthInByteArray)
-						{
-							kvp.Value.PartialBuffer.AddRange(fillupChar);
-							effectiveLength += fillupChar.Length;
-						}
-					}
-					else
-					{
-						kvp.Value.PartialBuffer.RemoveRange(kvp.Value.StrAttribute.StringMaxLengthInByteArray,
-							kvp.Value.PartialBuffer.Count - kvp.Value.StrAttribute.StringMaxLengthInByteArray);
-						effectiveLength = kvp.Value.StrAttribute.StringMaxLengthInByteArray;
-					}
-
-					continue;
-				}
-
-				var correspondingLengthField = _fieldListByName[strAttr.LengthFieldName];
-
-				if (correspondingLengthField.FieldInfo.FieldType == typeof(int))
-				{
-					correspondingLengthField.FieldInfo.SetValue(data, effectiveLength);
-					continue;
-				}
-
-				if (correspondingLengthField.FieldInfo.FieldType == typeof(uint))
-				{
-					correspondingLengthField.FieldInfo.SetValue(data, (uint) effectiveLength);
-					continue;
-				}
-
-				if (correspondingLengthField.FieldInfo.FieldType == typeof(short))
-				{
-					correspondingLengthField.FieldInfo.SetValue(data, (short) effectiveLength);
-					continue;
-				}
-
-				if (correspondingLengthField.FieldInfo.FieldType == typeof(ushort))
-				{
-					correspondingLengthField.FieldInfo.SetValue(data, (ushort) effectiveLength);
-					continue;
-				}
-
-				if (correspondingLengthField.FieldInfo.FieldType == typeof(byte))
-				{
-					correspondingLengthField.FieldInfo.SetValue(data, (byte) effectiveLength);
-					continue;
-				}
-
-				throw new ProtocolConverterException("CalculateStringForWriting: setting length field type " +
-				                                     correspondingLengthField.FieldInfo.FieldType + " not supported yet");
+				CalculateBufferForString(data, kvp);
+				continue;
 			}
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void CalculateBufferForString(T data, KeyValuePair<int, ConverterFieldInfo<T>> kvp)
+		{
+			var converterFieldInfo = kvp.Value;
+			var strAttr = converterFieldInfo.StrAttribute;
+
+			kvp.Value.PartialBuffer.Clear();
+
+			byte[] fillupChar = null;
+
+			// encode str to destination byte array
+			switch (strAttr.Encoder)
+			{
+				case SupportedEncoder.None:
+				case SupportedEncoder.Default:
+					kvp.Value.PartialBuffer.AddRange(Encoding.ASCII.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
+					fillupChar = Encoding.ASCII.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
+					break;
+				case SupportedEncoder.UnicodeEncoder:
+					kvp.Value.PartialBuffer.AddRange(Encoding.Unicode.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
+					fillupChar = Encoding.Unicode.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
+					break;
+			}
+
+			int effectiveLength = kvp.Value.PartialBuffer.Count;
+
+			if (strAttr.IsFixedLengthString)
+			{
+				if (effectiveLength < kvp.Value.StrAttribute.StringMaxLengthInByteArray)
+				{
+					while (effectiveLength < kvp.Value.StrAttribute.StringMaxLengthInByteArray)
+					{
+						kvp.Value.PartialBuffer.AddRange(fillupChar);
+						effectiveLength += fillupChar.Length;
+					}
+				}
+				else
+				{
+					kvp.Value.PartialBuffer.RemoveRange(kvp.Value.StrAttribute.StringMaxLengthInByteArray,
+						kvp.Value.PartialBuffer.Count - kvp.Value.StrAttribute.StringMaxLengthInByteArray);
+					effectiveLength = kvp.Value.StrAttribute.StringMaxLengthInByteArray;
+				}
+
+				return;
+			}
+
+			var correspondingLengthField = _fieldListByName[strAttr.LengthFieldName];
+
+			if (correspondingLengthField.FieldInfo.FieldType == typeof(int))
+			{
+				correspondingLengthField.FieldInfo.SetValue(data, effectiveLength);
+				return;
+			}
+
+			if (correspondingLengthField.FieldInfo.FieldType == typeof(uint))
+			{
+				correspondingLengthField.FieldInfo.SetValue(data, (uint) effectiveLength);
+				return;
+			}
+
+			if (correspondingLengthField.FieldInfo.FieldType == typeof(short))
+			{
+				correspondingLengthField.FieldInfo.SetValue(data, (short) effectiveLength);
+				return;
+			}
+
+			if (correspondingLengthField.FieldInfo.FieldType == typeof(ushort))
+			{
+				correspondingLengthField.FieldInfo.SetValue(data, (ushort) effectiveLength);
+				return;
+			}
+
+			if (correspondingLengthField.FieldInfo.FieldType == typeof(byte))
+			{
+				correspondingLengthField.FieldInfo.SetValue(data, (byte) effectiveLength);
+				return;
+			}
+
+			throw new ProtocolConverterException("CalculateStringForWriting: setting length field type " +
+			                                     correspondingLengthField.FieldInfo.FieldType + " not supported yet");
 		}
 
 		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data)
@@ -263,6 +272,8 @@ namespace holonsoft.FastProtocolConverter
 
 			if (kvp.Value.IsString)
 			{
+				CalculateBufferForString(data, kvp);
+
 				result.AddRange(kvp.Value.PartialBuffer);
 				return;
 			}

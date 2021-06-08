@@ -130,7 +130,7 @@ namespace holonsoft.FastProtocolConverter
 
             if (_fieldListSeqPos.Count == 0)
             {
-                if (_fieldListFixPos.Any(kvp => kvp.Value.IsString))
+                if (_fieldListFixPos.Any(kvp => kvp.Value.IsString && !kvp.Value.StrAttribute.IsFixedLengthString))
                 {
                     var msg = "string fields in a 'fixed position protocol ' are not allowed, consider to add 'sequence no' infos to all fields";
                     _logger?.Log(LogLevel.Critical, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} {msg}");
