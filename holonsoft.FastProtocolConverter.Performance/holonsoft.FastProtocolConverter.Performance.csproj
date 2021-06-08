@@ -14,7 +14,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\holonsoft.FastProtocolConverter.Abstractions\holonsoft.FastProtocolConverter.Abstractions.csproj" />
+    <ProjectReference Include="..\holonsoft.FastProtocolConverter.Abstractions\holonsoft.FastProtocolConverter.Abstractions.csproj">
+      <Private>true</Private>
+    </ProjectReference>
     <ProjectReference Include="..\holonsoft.FastProtocolConverter\holonsoft.FastProtocolConverter.csproj" />
   </ItemGroup>
 

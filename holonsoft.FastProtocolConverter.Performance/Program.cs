@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace holonsoft.FastProtocolConverter.Performance
 {
@@ -12,6 +14,14 @@ namespace holonsoft.FastProtocolConverter.Performance
 
 		static void Main(string[] args)
 		{
+			if (!File.Exists("holonsoft.FastProtocolConverter.Abstractions.dll"))
+			{
+				throw new ApplicationException("Why to the hell ...");
+			}
+
+			// at the moment we have to preload the file, otherwise the assembly resolving fails
+			var a = Assembly.LoadFrom("./holonsoft.FastProtocolConverter.Abstractions.dll");
+
 			Console.WriteLine("Starting test for " + _convertToCount + " conversions, performed " + _loopCount + " times");
 
 			PerformanceWithActivatorCreate();
