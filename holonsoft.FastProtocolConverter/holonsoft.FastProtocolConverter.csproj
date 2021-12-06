@@ -1,18 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>netcoreapp3.1;net472;net48;net5.0</TargetFrameworks>
+    <TargetFrameworks>netcoreapp3.1;net472;net48;net5.0;net6.0</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <Copyright>holonsoft</Copyright>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <PackageProjectUrl>https://github.com/holonsoft/FastProtocolConverter</PackageProjectUrl>
     <RepositoryUrl>https://github.com/holonsoft/FastProtocolConverter</RepositoryUrl>
-    <Version>2.5.1</Version>
+    <Version>2.6.1</Version>
     <Description>Reflection based fast protocol converter:
 Converts raw bytes (e. g. from a hardware device) data to an instance of a class or vice versa</Description>
     <RepositoryType>GIT</RepositoryType>
-    <PackageTags>#net4.7.2 #net4.8 #netcore3.1 #net5</PackageTags>
+    <PackageTags>#net4.7.2 #net4.8 #netcore3.1 #net5 #net6</PackageTags>
     <Company>holonsoft</Company>
     <Authors>Alexander Bülow, Christian Vogt</Authors>
   </PropertyGroup>
@@ -25,7 +25,6 @@ Converts raw bytes (e. g. from a hardware device) data to an instance of a class
 
   <ItemGroup>
     <ProjectReference Include="..\holonsoft.FastProtocolConverter.Abstractions\holonsoft.FastProtocolConverter.Abstractions.csproj" />
-    <ProjectReference Include="..\holonsoft.FastProtocolConverter.Abstracts\holonsoft.FastProtocolConverter.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
