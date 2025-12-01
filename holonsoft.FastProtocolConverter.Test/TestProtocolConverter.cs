@@ -1,4 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using holonsoft.FastProtocolConverter.Abstractions.Enums;
+using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
+using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
+using holonsoft.FastProtocolConverter.Test.dto;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,10 +10,6 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using Xunit;
-using holonsoft.FastProtocolConverter.Abstractions.Enums;
-using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
-using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
-using holonsoft.FastProtocolConverter.Test.dto;
 
 namespace holonsoft.FastProtocolConverter.Test
 {
@@ -29,7 +29,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestArgumentDetection()
 		{
-			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>; 
+			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>;
 
 			converter.Prepare();
 		}
@@ -45,7 +45,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestDoublePositionException()
 		{
-			var converter = new ProtocolConverter<DumbPocoDoublePositionFields>(_logger) as IProtocolConverter<DumbPocoDoublePositionFields>; 
+			var converter = new ProtocolConverter<DumbPocoDoublePositionFields>(_logger) as IProtocolConverter<DumbPocoDoublePositionFields>;
 
 			Assert.Throws<ProtocolConverterException>(() => converter.Prepare());
 		}
@@ -54,7 +54,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		[Fact]
 		public void TestConvertFromByteArray()
 		{
-			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>; 
+			var converter = new ProtocolConverter<DumbPoco>(_logger) as IProtocolConverter<DumbPoco>;
 			converter.Prepare();
 
 			var byteList = new List<byte>();
@@ -195,8 +195,8 @@ namespace holonsoft.FastProtocolConverter.Test
 			Assert.Equal(Math.PI, myInstance.DoubleField);
 			Assert.Equal((uint) 4812, myInstance.UIntField);
 			Assert.Equal((ushort) 4711, myInstance.UShortField);
-			Assert.Equal(true, myInstance.TrueField);
-			Assert.Equal(false, myInstance.FalseField);
+			Assert.True(myInstance.TrueField);
+			Assert.False(myInstance.FalseField);
 		}
 
 
@@ -317,7 +317,7 @@ namespace holonsoft.FastProtocolConverter.Test
 			var byteArrayResult = converter.ConvertToByteArray(myInstance);
 
 #if NET   // C#8 and higher  
-			Assert.Equal(21, (int)byteArrayResult[^1]);
+			Assert.Equal(21, (int) byteArrayResult[^1]);
 #else
 			// ReSharper disable once UseIndexFromEndExpression
 			Assert.Equal(21, (int) byteArrayResult[byteArrayResult.Length - 1]);
@@ -610,10 +610,10 @@ namespace holonsoft.FastProtocolConverter.Test
 
 			var r = new AdvancedTypesPoco()
 			{
-				DateTimeField = new DateTime(2021, 06, 01, 13, 14, 15).ToUniversalTime(), 
+				DateTimeField = new DateTime(2021, 06, 01, 13, 14, 15).ToUniversalTime(),
 				GuidField = Guid.NewGuid(),
 			};
-			
+
 			var resultArray = converter.ConvertToByteArray(r);
 
 			Assert.Equal(37, resultArray.Length);
@@ -635,9 +635,9 @@ namespace holonsoft.FastProtocolConverter.Test
 
 			var r = new SimplePocoWithGap()
 			{
-				JobNumberIn = 4711, 
-				MachineMode = PLCMachineMode.B, 
-				Request = true, 
+				JobNumberIn = 4711,
+				MachineMode = PLCMachineMode.B,
+				Request = true,
 				Start = true,
 			};
 

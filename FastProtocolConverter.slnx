@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="holonsoft.FastProtocolConverter.Abstractions/holonsoft.FastProtocolConverter.Abstractions.csproj" />
+  <Project Path="holonsoft.FastProtocolConverter.Performance/holonsoft.FastProtocolConverter.Performance.csproj">
+    <BuildDependency Project="holonsoft.FastProtocolConverter.Abstractions/holonsoft.FastProtocolConverter.Abstractions.csproj" />
+    <BuildDependency Project="holonsoft.FastProtocolConverter.Test/holonsoft.FastProtocolConverter.Test.csproj" />
+    <BuildDependency Project="holonsoft.FastProtocolConverter/holonsoft.FastProtocolConverter.csproj" />
+  </Project>
+  <Project Path="holonsoft.FastProtocolConverter.Test/holonsoft.FastProtocolConverter.Test.csproj">
+    <BuildDependency Project="holonsoft.FastProtocolConverter.Abstractions/holonsoft.FastProtocolConverter.Abstractions.csproj" />
+    <BuildDependency Project="holonsoft.FastProtocolConverter/holonsoft.FastProtocolConverter.csproj" />
+  </Project>
+  <Project Path="holonsoft.FastProtocolConverter/holonsoft.FastProtocolConverter.csproj">
+    <BuildDependency Project="holonsoft.FastProtocolConverter.Abstractions/holonsoft.FastProtocolConverter.Abstractions.csproj" />
+  </Project>
+</Solution>

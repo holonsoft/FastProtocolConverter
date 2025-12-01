@@ -1,4 +1,7 @@
 # FastProtocolConverter
+Supports NET8, NET9 and NET10
+
+
 Converts raw bytes (e. g. from a hardware device) data to an instance of a class or vice versa
 
 At a glance
