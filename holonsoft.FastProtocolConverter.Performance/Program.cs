@@ -18,9 +18,18 @@ namespace holonsoft.FastProtocolConverter.Performance
 			// Stopwatch loops below are kept for a quick smoke measurement.
 			if (args.Length > 0 && args[0] == "--benchmark")
 			{
+				// holonsoft.FluentConditions 3.0.1 is published as a non optimized build, which the
+				// default validator refuses. Measuring its cost is exactly the point here.
+				var config = BenchmarkDotNet.Configs.ManualConfig
+					.CreateEmpty()
+					.AddLogger(BenchmarkDotNet.Loggers.ConsoleLogger.Default)
+					.AddColumnProvider(BenchmarkDotNet.Columns.DefaultColumnProviders.Instance)
+					.AddDiagnoser(BenchmarkDotNet.Diagnosers.MemoryDiagnoser.Default)
+					.WithOptions(BenchmarkDotNet.Configs.ConfigOptions.DisableOptimizationsValidator);
+
 				BenchmarkDotNet.Running.BenchmarkSwitcher
 					.FromAssembly(typeof(Program).Assembly)
-					.Run(args[1..]);
+					.Run(args[1..], config);
 				return;
 			}
 
