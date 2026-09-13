@@ -495,14 +495,17 @@ Against 3.6.1, on a 38 byte frame with every primitive:
 
 | | 3.6.1 | 4.0 | |
 |---|---:|---:|---|
-| Read, little endian | 118.09 ns / 344 B | 68.17 ns / 104 B | -42% |
-| Read, big endian | 146.21 ns / 568 B | 67.37 ns / 104 B | -54% |
-| Read into a reused instance | 115.58 ns / 288 B | 59.59 ns / 48 B | -48% |
-| Write, little endian | 245.33 ns / 888 B | 110.74 ns / 208 B | -55% |
-| Write, big endian | 376.86 ns / 1528 B | 112.02 ns / 208 B | -70% |
+| Read, little endian | 118.09 ns / 344 B | 58.65 ns / 56 B | -50% |
+| Read, big endian | 146.21 ns / 568 B | 58.19 ns / 56 B | -60% |
+| Read into a reused instance | 115.58 ns / 288 B | 28.92 ns / **0 B** | -75% |
+| Write, little endian | 245.33 ns / 888 B | 55.76 ns / 64 B | -77% |
+| Write, big endian | 376.86 ns / 1528 B | 56.06 ns / 64 B | -85% |
+| Read with a string | 73.96 ns / 288 B | 28.12 ns / 160 B | -62% |
+| Write with a string | 166.05 ns / 384 B | 44.08 ns / 64 B | -74% |
 
-Byte order is free now, in both directions, and reading a frame out of a receive buffer without
-copying it first costs 60 ns into a reused instance. See
+Byte order is free now, in both directions. Reading into a reused instance and writing into a buffer
+you supply allocate **nothing per message**, and reading a frame out of a receive buffer without
+copying it first costs 30 ns. See
 `holonsoft.FastProtocolConverter.Performance/baseline-before-v4.md` for how every one of those
 numbers was measured.
 

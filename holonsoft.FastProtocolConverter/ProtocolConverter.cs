@@ -35,8 +35,6 @@ namespace holonsoft.FastProtocolConverter
         /// A protocol without string fields needs no scratch buffer for writing at all, and one with
         /// strings can size the buffer up front instead of letting it grow from four bytes.
         /// </summary>
-        private bool _hasStringFields;
-        private int _stringBufferCapacity;
 
         /// <summary>
         /// Expected size of a written message, so the result list is allocated once at the right
@@ -320,7 +318,6 @@ namespace holonsoft.FastProtocolConverter
                 .Where(x => x.IsString)
                 .ToList();
 
-            _hasStringFields = stringFields.Count > 0;
 
             var writeList = _fieldListSeqPos.Count == 0 ? _fieldListFixPos.Values : _fieldListSeqPos.Values;
 
@@ -338,12 +335,6 @@ namespace holonsoft.FastProtocolConverter
             _fixPosFields = _fieldListFixPos.ToArray();
             _seqPosFields = _fieldListSeqPos.ToArray();
 
-            if (_hasStringFields)
-            {
-                // a variable length string has no known size, 64 is a starting point that avoids the
-                // first few doublings without wasting much
-                _stringBufferCapacity = stringFields.Max(x => x.EffectiveFieldSize > 0 ? x.EffectiveFieldSize : 64);
-            }
 
             _logger?.Log(LogLevel.Trace, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} minimum length of byte array is {_totalMinLength}");
 
