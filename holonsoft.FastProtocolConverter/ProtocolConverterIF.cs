@@ -1,4 +1,5 @@
-﻿using holonsoft.FastProtocolConverter.Abstractions.Delegates;
+﻿using System;
+using holonsoft.FastProtocolConverter.Abstractions.Delegates;
 using holonsoft.FastProtocolConverter.Abstractions.Interfaces;
 
 
@@ -11,6 +12,9 @@ namespace holonsoft.FastProtocolConverter
 
 		T IProtocolConverter<T>.ConvertFromByteArray(byte[] data) => ConvertFromByteArray(data);
 		void IProtocolConverter<T>.ConvertFromByteArray(byte[] data, T instance) => ConvertFromByteArray(data, instance);
+
+		T IProtocolConverter<T>.ConvertFromByteArray(ReadOnlySpan<byte> data) => ConvertFromByteArray(data);
+		void IProtocolConverter<T>.ConvertFromByteArray(ReadOnlySpan<byte> data, T instance) => ConvertFromByteArray(data, instance);
 
 		byte[] IProtocolConverter<T>.ConvertToByteArray(T data) => ConvertToByteArray(data);
 

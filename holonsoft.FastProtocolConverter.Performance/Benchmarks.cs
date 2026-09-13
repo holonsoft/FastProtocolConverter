@@ -29,6 +29,15 @@ namespace holonsoft.FastProtocolConverter.Performance
 
 		private BenchmarkPoco _reusableInstance;
 
+		/// <summary>
+		/// A receive buffer holding the frame somewhere in the middle, which is what a socket or a
+		/// pipe actually hands over. Before the span overloads existed the caller had to copy the
+		/// frame out of here into its own byte[] before the converter would look at it.
+		/// </summary>
+		private byte[] _receiveBuffer;
+		private int _frameOffset;
+		private int _frameLength;
+
 
 		[GlobalSetup]
 		public void Setup()
@@ -81,7 +90,35 @@ namespace holonsoft.FastProtocolConverter.Performance
 			_stringPayload = _withStrings.ConvertToByteArray(_stringSource);
 
 			_reusableInstance = new BenchmarkPoco();
+
+			// the frame sits at a non zero offset, so the span is never the whole array
+			_frameOffset = 7;
+			_frameLength = _littlePayload.Length;
+			_receiveBuffer = new byte[_frameOffset + _frameLength + 5];
+			_littlePayload.CopyTo(_receiveBuffer, _frameOffset);
 		}
+
+
+		[Benchmark(Description = "Read  from receive buffer, copy to array first")]
+		public BenchmarkPoco ReadFromBufferWithCopy()
+		{
+			// what every caller had to write before the span overloads existed
+			var frame = new byte[_frameLength];
+			Array.Copy(_receiveBuffer, _frameOffset, frame, 0, _frameLength);
+
+			return _littleEndian.ConvertFromByteArray(frame);
+		}
+
+
+		[Benchmark(Description = "Read  from receive buffer, span, no copy")]
+		public BenchmarkPoco ReadFromBufferAsSpan()
+			=> _littleEndian.ConvertFromByteArray(_receiveBuffer.AsSpan(_frameOffset, _frameLength));
+
+
+		[Benchmark(Description = "Read  from receive buffer, span into reused instance")]
+		public void ReadFromBufferAsSpanIntoExistingInstance()
+			=> _littleEndian.ConvertFromByteArray(
+					_receiveBuffer.AsSpan(_frameOffset, _frameLength), _reusableInstance);
 
 
 		[Benchmark(Description = "Read  38 byte POCO, little endian")]
