@@ -334,9 +334,13 @@ written, so `ConvertToByteArray` allocates the result and writes straight into i
 
 A pooled buffer was tried first and **rejected on measurement**: it cut allocation by 46% but cost
 between 3% and 23% in time, because renting and returning costs more than the single allocation it
-saves on a frame this small. It survives only as a fallback that is never taken in practice, for the
-case that the computed size and the writer ever disagree, because silently returning a half written
-or zero padded frame is the worst possible failure mode here.
+saves on a frame this small. It was then kept for a while as a fallback for the case that the
+calculated size and the writer ever disagree, and dropped again after instrumenting it proved that
+no test in the suite ever reaches it. A fallback that never runs is a fallback that is never
+verified, and it silently re ran the whole write, including the part that assigns the length fields
+back onto the caller's POCO. The size is now checked on every call and a mismatch throws, because it
+could only ever mean a bug in this library, and handing back a half written or zero padded frame
+that still looks well formed is the worst failure mode available here.
 
 **`SortedList` was boxing an enumerator per message, in both directions.**
 `SortedList<K,V>.GetEnumerator()` returns `IEnumerator<KeyValuePair<K,V>>` rather than its own

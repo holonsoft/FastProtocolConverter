@@ -31,33 +31,19 @@ namespace holonsoft.FastProtocolConverter
 
 			WriteAllFields(ref writer, data);
 
-			if (!writer.Overflowed && (writer.Position == result.Length)) return result;
-
-			// GetByteCount and the writer disagree, which is a bug in this library rather than
-			// anything the caller did. Rather than hand back a half written or zero padded frame,
-			// fall back to a buffer that can grow and take the copy.
-			return ConvertToByteArrayGrowing(data);
-		}
-
-
-		/// <summary>
-		/// Fallback for the case that the calculated size was wrong. Never taken in practice, and kept
-		/// because silently returning a malformed frame is the worst possible failure mode here.
-		/// </summary>
-		private byte[] ConvertToByteArrayGrowing(T data)
-		{
-			var writer = ByteWriter.Rented(_writeSizeEstimate);
-
-			try
+			// GetByteCount and the writer disagreeing would be a bug in this library, not anything the
+			// caller did, and it is the one thing that could hand back a half written or zero padded
+			// frame that still looks well formed. So it is checked on every call and reported loudly
+			// rather than papered over.
+			if (writer.Overflowed || (writer.Position != result.Length))
 			{
-				WriteAllFields(ref writer, data);
+				throw new ProtocolConverterException(
+					$"Internal size mismatch while writing {typeof(T).Name}: {result.Length} bytes were calculated"
+					+ $" but the writer produced {(writer.Overflowed ? "more" : writer.Position.ToString())}."
+					+ " This is a bug in FastProtocolConverter, please report it with the protocol definition.");
+			}
 
-				return writer.WrittenSpan.ToArray();
-			}
-			finally
-			{
-				writer.Dispose();
-			}
+			return result;
 		}
 
 
