@@ -1,4 +1,4 @@
-# FastProtocolConverter
+﻿# FastProtocolConverter
 Supports NET8, NET9 and NET10
 
 
@@ -41,6 +41,35 @@ If you prefer to write the limits in a different style, name the culture in the 
 This is safe because the culture is declared in the source and travels with it. The culture of the
 machine is never consulted. An unknown culture name fails at `Prepare()` rather than falling back to
 something else, so a typo cannot silently change what a limit means.
+
+### Reading without copying the bytes first
+
+Raw bytes rarely arrive in a `byte[]` that starts exactly at the frame. They arrive in a socket
+receive buffer, a rented buffer or a slice of something larger. The `ReadOnlySpan<byte>` overloads
+read straight out of whatever holds them:
+
+```c#
+    // one receive buffer, several frames, no copy and no allocation per frame
+    var bytesRead = socket.Receive(receiveBuffer);
+
+    for (var offset = 0; offset + frameLength <= bytesRead; offset += frameLength)
+    {
+        converter.ConvertFromByteArray(receiveBuffer.AsSpan(offset, frameLength), reuseMe);
+        Handle(reuseMe);
+    }
+```
+
+Combined with a reused instance this is the cheapest read the library offers: nothing is allocated
+per message except what the POCO itself holds, for example its strings.
+
+### Thread safety
+
+A prepared converter is safe to share between threads. `Prepare()` is not: call it once, on one
+thread, before the converter is handed out.
+
+Both conversion directions keep every piece of per message state on the stack. Reading into a
+**reused instance** is of course only safe if that instance belongs to the calling thread, a POCO
+handed to two threads at once is a data race like any other object.
 
 ### Error handling when reading
 
@@ -95,6 +124,21 @@ The interface itself it pretty easy and straight forward to use. We use Microsof
 		/// <param name="data">byte array with raw values</param>
 		/// <param name="instance">an outside created, reusable instance of a POCO</param>
 		void ConvertFromByteArray(byte[] data, T instance);
+
+		/// <summary>
+		/// Use a source span to fill the content of POCO
+		/// Creates every time a new instance of POCO
+		/// </summary>
+		/// <param name="data">span with raw values</param>
+		/// <returns>An instance of POCO</returns>
+		T ConvertFromByteArray(ReadOnlySpan<byte> data);
+
+		/// <summary>
+		/// Use a source span to fill the content of POCO
+		/// </summary>
+		/// <param name="data">span with raw values</param>
+		/// <param name="instance">an outside created, reusable instance of a POCO</param>
+		void ConvertFromByteArray(ReadOnlySpan<byte> data, T instance);
 
 		/// <summary>
 		/// Converts a POCO content to a byte array
@@ -395,5 +439,62 @@ public class PocoWithRanges
 
 ```
 
+
+## Upgrading from 3.x to 4.0
+
+The wire format did not change. A 3.x frame is a 4.0 frame, which is pinned by byte exact vectors
+in the test suite. Four things behave differently.
+
+**1. Range limits are parsed with the invariant culture.**
+This is the one that can change what your program does without any compiler error. Before, the
+limits in `ProtocolFieldRangeAttribute` were parsed with the culture of the machine, so
+`MinValue = "-100.5"` was read as **-1005** on a German or French system and the range guard was
+wrong by a factor of ten, silently and only on some machines. Limits are now parsed with the
+invariant culture. If you actually wrote your limits in a local style, declare it:
+`[ProtocolSetupArgument(RangeCulture = "de-DE")]`. An unknown culture name now fails at `Prepare()`
+instead of falling back to something else.
+
+**2. A truncated frame throws `ProtocolConverterException`.**
+Before, a byte array that was too short surfaced as whatever the BCL happened to throw, an
+`ArgumentException` out of `Array.Copy` or `BitConverter`, and for sequence protocols there was no
+length check at all. If you catch `ArgumentException` around a conversion, catch
+`ProtocolConverterException` instead.
+
+**3. `IProtocolConverter<T>` has two new members**, the `ReadOnlySpan<byte>` read overloads. This
+only affects you if you implement or mock the interface yourself.
+
+**4. `Guid` respects `UseBigEndian` when writing.**
+The reader always reversed the bytes for a big endian protocol, the writer ignored the flag, so a
+big endian Guid did not survive a round trip through this library. Both sides agree now. If you
+persisted big endian Guid frames written by 3.x, they were written little endian and will now read
+differently. Little endian protocols are unaffected.
+
+### Fixed in 4.0
+
+* **A prepared converter is now thread safe.** Both directions kept per message state on the shared
+  field info, so two threads using one converter produced wrong values. Under a 20.000 iteration
+  concurrent read, 323 results came back silently wrong. Everything per message lives on the stack
+  now.
+* **`decimal` and `sbyte` work.** They were documented as supported and threw
+  `NotImplementedException`.
+* **The minimum length check is real.** It reported 14 bytes for a 272 byte protocol, so lengths
+  between 14 and 271 slipped past the guard.
+
+### And it is quite a bit faster
+
+Against 3.6.1, on a 38 byte frame with every primitive:
+
+| | 3.6.1 | 4.0 | |
+|---|---:|---:|---|
+| Read, little endian | 118.09 ns / 344 B | 68.17 ns / 104 B | -42% |
+| Read, big endian | 146.21 ns / 568 B | 67.37 ns / 104 B | -54% |
+| Read into a reused instance | 115.58 ns / 288 B | 59.59 ns / 48 B | -48% |
+| Write, little endian | 245.33 ns / 888 B | 110.74 ns / 208 B | -55% |
+| Write, big endian | 376.86 ns / 1528 B | 112.02 ns / 208 B | -70% |
+
+Byte order is free now, in both directions, and reading a frame out of a receive buffer without
+copying it first costs 60 ns into a reused instance. See
+`holonsoft.FastProtocolConverter.Performance/baseline-before-v4.md` for how every one of those
+numbers was measured.
 
 We hope this software is helpful for your project. Do not hesiate to contact us and ask for new features or report a bug.
