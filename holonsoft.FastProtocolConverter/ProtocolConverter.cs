@@ -46,6 +46,23 @@ namespace holonsoft.FastProtocolConverter
         private int _writeSizeEstimate = 16;
 
         /// <summary>
+        /// Exact size of everything whose length does not depend on the values, see GetByteCount.
+        /// </summary>
+        private int _writeFixedSize;
+
+        private bool _hasVariableLengthStrings;
+
+        /// <summary>
+        /// The very same field entries as the sorted lists above, as plain arrays.
+        ///
+        /// SortedList&lt;K,V&gt;.GetEnumerator() returns the interface rather than its own struct
+        /// enumerator, so every foreach over one of those lists boxed an enumerator on the heap, once
+        /// per converted message, in both directions. Iterating an array does not.
+        /// </summary>
+        private KeyValuePair<int, ConverterFieldInfo<T>>[] _fixPosFields = Array.Empty<KeyValuePair<int, ConverterFieldInfo<T>>>();
+        private KeyValuePair<int, ConverterFieldInfo<T>>[] _seqPosFields = Array.Empty<KeyValuePair<int, ConverterFieldInfo<T>>>();
+
+        /// <summary>
         /// Culture for the string limits of ProtocolFieldRangeAttribute. Invariant unless the
         /// protocol definition names a different one, never taken from the environment.
         /// </summary>
@@ -307,7 +324,19 @@ namespace holonsoft.FastProtocolConverter
 
             var writeList = _fieldListSeqPos.Count == 0 ? _fieldListFixPos.Values : _fieldListSeqPos.Values;
 
-            _writeSizeEstimate = Math.Max(16, writeList.Sum(x => Math.Max(x.EffectiveFieldSize, 0)));
+            // the exact number of bytes the declared fields produce. A variable length string counts
+            // as zero here because its size comes from the value, GetByteCount adds it per instance
+            _writeFixedSize = writeList.Sum(x => Math.Max(x.EffectiveFieldSize, 0));
+
+            // what the pooled write buffer starts at. Not the same number: a tiny protocol is rounded
+            // up so the first few fields never trigger a growth, which would make it useless as an
+            // exact size
+            _writeSizeEstimate = Math.Max(16, _writeFixedSize);
+
+            _hasVariableLengthStrings = stringFields.Any(x => !x.StrAttribute.IsFixedLengthString);
+
+            _fixPosFields = _fieldListFixPos.ToArray();
+            _seqPosFields = _fieldListSeqPos.ToArray();
 
             if (_hasStringFields)
             {

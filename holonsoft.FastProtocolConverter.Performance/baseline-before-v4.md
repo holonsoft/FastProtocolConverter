@@ -317,6 +317,66 @@ every consumer that hands the value to a `DateTimeOffset` silently reinterprets 
 `TestDateTimeConversion` asserts it directly, along with round trips in both widths, both byte
 orders, and a timestamp before the epoch.
 
+## Phase 4, step 4: writing into a buffer the caller owns
+
+Three changes, and the one that mattered most was not the one this step set out to make.
+
+**A caller supplied buffer.** `TryConvertToByteArray(T, Span<byte>, out int)` writes into a buffer
+the caller owns, and `GetByteCount(T)` says exactly how big it has to be. The Try pattern was chosen
+over `IBufferWriter<byte>`: it is what the BCL uses for this, and `IBufferWriter` earns its
+indirection only when the sink spans several segments. Both entry points share one `ByteWriter`
+cursor, so there is exactly one copy of the field writing logic and no way for the two overloads to
+drift apart.
+
+**The result array is allocated once, at its exact size.** The size is known before a byte is
+written, so `ConvertToByteArray` allocates the result and writes straight into it. It used to be a
+`List<byte>`, which cost the list object, its backing array, and a `ToArray` copy on top.
+
+A pooled buffer was tried first and **rejected on measurement**: it cut allocation by 46% but cost
+between 3% and 23% in time, because renting and returning costs more than the single allocation it
+saves on a frame this small. It was then kept for a while as a fallback for the case that the
+calculated size and the writer ever disagree, and dropped again after instrumenting it proved that
+no test in the suite ever reaches it. A fallback that never runs is a fallback that is never
+verified, and it silently re ran the whole write, including the part that assigns the length fields
+back onto the caller's POCO. The size is now checked on every call and a mismatch throws, because it
+could only ever mean a bug in this library, and handing back a half written or zero padded frame
+that still looks well formed is the worst failure mode available here.
+
+**`SortedList` was boxing an enumerator per message, in both directions.**
+`SortedList<K,V>.GetEnumerator()` returns `IEnumerator<KeyValuePair<K,V>>` rather than its own
+struct enumerator, so every `foreach` over the field list put a boxed enumerator on the heap, once
+per converted message, on the read side as well as the write side. That is 48 bytes per conversion
+and it has been there far longer than this renovation. The field entries are now also kept as plain
+arrays, built once in `Prepare()`.
+
+A/B of the same tree with and without all three, back to back:
+
+| Method | before | after | time | alloc |
+|---|---:|---:|---:|---|
+| Read  from buffer, copy first  |  97.74 ns |  65.31 ns | -33% | 168 -> 120 B |
+| Read  from buffer, span        |  64.72 ns |  33.29 ns | -49% | 104 ->  56 B |
+| Read  from buffer, span reuse  |  57.51 ns |  28.97 ns | -50% |  48 -> **0 B** |
+| Read  LE                       |  93.06 ns |  59.33 ns | -36% | 104 ->  56 B |
+| Read  BE                       |  92.07 ns |  58.95 ns | -36% | 104 ->  56 B |
+| Read  reused                   |  58.56 ns |  29.21 ns | -50% |  48 -> **0 B** |
+| Write LE                       | 105.36 ns |  59.75 ns | -43% | 208 ->  64 B |
+| Write BE                       | 107.72 ns |  59.85 ns | -44% | 208 ->  64 B |
+| Read  DateTime/Guid/decimal LE |  57.32 ns |  37.06 ns | -35% | 112 ->  64 B |
+| Read  DateTime/Guid/decimal BE |  58.22 ns |  38.50 ns | -34% | 112 ->  64 B |
+| Write DateTime/Guid/decimal LE |  60.29 ns |  41.47 ns | -31% | 264 ->  72 B |
+| Write DateTime/Guid/decimal BE |  59.72 ns |  44.29 ns | -26% | 264 ->  72 B |
+| Write into a reused buffer     |         - |  58.64 ns |    - |     **0 B** |
+| Read  string                   |  42.87 ns |  28.73 ns | -33% | 208 -> 160 B |
+| Write string                   | 112.88 ns | 119.55 ns | **+5.9%** | 296 -> 152 B |
+
+There is no control row this time, every path was touched. The string write is the one row that
+moved the wrong way, and it is also the one row that still allocates a `List<byte>` scratch buffer
+per call. Encoding straight into the destination is the obvious next step and should take that row
+to 64 bytes as well.
+
+**Reading into a reused instance and writing into a reused buffer now allocate nothing at all.**
+That is the shape a signal processing loop wants: no garbage per message, at any rate.
+
 ## A note for the other holonsoft packages
 
 `holonsoft.FluentConditions` 3.0.1, `holonsoft.FluentDateTime` 2.1.1 and `holonsoft.Utils` 1.10.1

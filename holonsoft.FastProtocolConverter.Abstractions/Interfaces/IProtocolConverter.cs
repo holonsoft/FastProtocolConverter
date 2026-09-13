@@ -65,6 +65,34 @@ namespace holonsoft.FastProtocolConverter.Abstractions.Interfaces
 		byte[] ConvertToByteArray(T data);
 
 		/// <summary>
+		/// Converts a POCO into a buffer the caller owns, so a hot loop can serialise into a rented or
+		/// stack allocated frame without this library allocating anything at all.
+		/// </summary>
+		/// <remarks>
+		/// Returns false when the destination is too small, which is the usual Try pattern: either
+		/// size the buffer with <see cref="GetByteCount"/> beforehand, or probe with a buffer and grow
+		/// it on a false. Nothing meaningful is written in that case, so the destination can be reused.
+		/// </remarks>
+		/// <param name="data">POCO instance</param>
+		/// <param name="destination">the buffer to write into</param>
+		/// <param name="bytesWritten">how much of the destination was filled, zero when false is returned</param>
+		/// <returns>true when the POCO fitted into the destination</returns>
+		bool TryConvertToByteArray(T data, Span<byte> destination, out int bytesWritten);
+
+		/// <summary>
+		/// Exact number of bytes this POCO will produce, to size a buffer for
+		/// <see cref="TryConvertToByteArray"/>.
+		/// </summary>
+		/// <remarks>
+		/// For a protocol whose length does not depend on the values, which is every protocol without
+		/// a variable length string, this is a field read and costs nothing. A variable length string
+		/// has to be measured, which scans the value but does not encode it.
+		/// </remarks>
+		/// <param name="data">POCO instance</param>
+		/// <returns>the number of bytes ConvertToByteArray would return for this instance</returns>
+		int GetByteCount(T data);
+
+		/// <summary>
 		/// An event that will be fired in case of range violations of a field
 		/// </summary>
 		event OnRangeViolationDelegate OnRangeViolation;

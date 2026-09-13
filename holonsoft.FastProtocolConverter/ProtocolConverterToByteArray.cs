@@ -20,9 +20,101 @@ namespace holonsoft.FastProtocolConverter
 			ThrowIfNotPrepared();
 			ThrowIfNull(data, nameof(data));
 
-			// sized up front, the backing array used to double its way up from nothing
-			var result = new List<byte>(_writeSizeEstimate);
+			// The size is known before a single byte is written, so the result array is allocated once
+			// and written into directly. It used to be a List<byte>, which cost the list object, its
+			// backing array and a ToArray copy on top. A pooled buffer was tried instead and was
+			// slower: renting and returning costs more than the one allocation it saves on a frame
+			// this small.
+			var result = new byte[GetByteCountCore(data)];
 
+			var writer = new ByteWriter(result);
+
+			WriteAllFields(ref writer, data);
+
+			// GetByteCount and the writer disagreeing would be a bug in this library, not anything the
+			// caller did, and it is the one thing that could hand back a half written or zero padded
+			// frame that still looks well formed. So it is checked on every call and reported loudly
+			// rather than papered over.
+			if (writer.Overflowed || (writer.Position != result.Length))
+			{
+				throw new ProtocolConverterException(
+					$"Internal size mismatch while writing {typeof(T).Name}: {result.Length} bytes were calculated"
+					+ $" but the writer produced {(writer.Overflowed ? "more" : writer.Position.ToString())}."
+					+ " This is a bug in FastProtocolConverter, please report it with the protocol definition.");
+			}
+
+			return result;
+		}
+
+
+		/// <summary>
+		/// Writes the POCO into a buffer the caller owns, so a hot loop can serialise into a rented
+		/// or stack allocated frame without this library allocating anything at all.
+		///
+		/// Returns false and writes nothing meaningful when the destination is too small, which is the
+		/// usual Try pattern: either size the buffer with <see cref="GetByteCount"/> beforehand, or
+		/// probe with a buffer and grow it on a false.
+		/// </summary>
+		private bool TryConvertToByteArray(T data, Span<byte> destination, out int bytesWritten)
+		{
+			ThrowIfNotPrepared();
+			ThrowIfNull(data, nameof(data));
+
+			var writer = new ByteWriter(destination);
+
+			WriteAllFields(ref writer, data);
+
+			if (writer.Overflowed)
+			{
+				bytesWritten = 0;
+				return false;
+			}
+
+			bytesWritten = writer.Position;
+			return true;
+		}
+
+
+		/// <summary>
+		/// Exact number of bytes <paramref name="data"/> will produce, so a caller can size a buffer
+		/// for <see cref="TryConvertToByteArray"/>.
+		///
+		/// For a protocol whose length does not depend on the values, which is every protocol without
+		/// a variable length string, this is a field read and costs nothing. A variable length string
+		/// has to be measured, which is a scan of the value but not an encode of it.
+		/// </summary>
+		private int GetByteCount(T data)
+		{
+			ThrowIfNotPrepared();
+			ThrowIfNull(data, nameof(data));
+
+			return GetByteCountCore(data);
+		}
+
+
+		private int GetByteCountCore(T data)
+		{
+			if (!_hasVariableLengthStrings) return _writeFixedSize;
+
+			var total = _writeFixedSize;
+
+			foreach (var kvp in _seqPosFields)
+			{
+				var field = kvp.Value;
+
+				if (!field.IsString || field.StrAttribute.IsFixedLengthString) continue;
+
+				var value = (string) field.Getter(data) ?? string.Empty;
+
+				total += field.StringEncoding.GetByteCount(value);
+			}
+
+			return total;
+		}
+
+
+		private void WriteAllFields(ref ByteWriter writer, T data)
+		{
 			// Scratch buffer for string encoding. It is local to this call on purpose: it used to be
 			// a List<byte> on the shared ConverterFieldInfo, so two threads serialising different
 			// values through one prepared converter produced mixed up or truncated output.
@@ -31,29 +123,27 @@ namespace holonsoft.FastProtocolConverter
 
 			if (_fieldListSeqPos.Count == 0)
 			{
-				foreach (var kvp in _fieldListFixPos)
+				foreach (var kvp in _fixPosFields)
 				{
-					WriteFieldValueToArray(result, kvp, data, stringBuffer);
+					WriteFieldValueToArray(ref writer, kvp, data, stringBuffer);
 				}
+
+				return;
 			}
-			else
+
+			CalculateStringForWriting(data, stringBuffer);
+
+			foreach (var kvp in _seqPosFields)
 			{
-				CalculateStringForWriting(data, stringBuffer);
-
-				foreach (var kvp in _fieldListSeqPos)
-				{
-					WriteFieldValueToArray(result, kvp, data, stringBuffer);
-				}
+				WriteFieldValueToArray(ref writer, kvp, data, stringBuffer);
 			}
-
-			return result.ToArray();
 		}
 
 
 		private void CalculateStringForWriting(T data, List<byte> stringBuffer)
 		{
 			// calc length fields for strings
-			foreach (var kvp in _fieldListSeqPos)
+			foreach (var kvp in _seqPosFields)
 			{
 				if (!kvp.Value.IsString) continue;
 
@@ -144,7 +234,7 @@ namespace holonsoft.FastProtocolConverter
 		/// themselves never changes. Counterpart of SetFieldHandleDecimalValues.
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private void WriteDecimalToArray(List<byte> result, decimal value)
+		private void WriteDecimalToArray(ref ByteWriter result, decimal value)
 		{
 			Span<int> bits = stackalloc int[4];
 			decimal.GetBits(value, bits);
@@ -176,7 +266,7 @@ namespace holonsoft.FastProtocolConverter
 		/// Float and double go through their IEEE754 bit patterns, which is bit exact.
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static void Append16(List<byte> target, ushort value, bool bigEndian)
+		private static void Append16(ref ByteWriter target, ushort value, bool bigEndian)
 		{
 			if (bigEndian)
 			{
@@ -192,7 +282,7 @@ namespace holonsoft.FastProtocolConverter
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static void Append32(List<byte> target, uint value, bool bigEndian)
+		private static void Append32(ref ByteWriter target, uint value, bool bigEndian)
 		{
 			if (bigEndian)
 			{
@@ -212,7 +302,7 @@ namespace holonsoft.FastProtocolConverter
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private static void Append64(List<byte> target, ulong value, bool bigEndian)
+		private static void Append64(ref ByteWriter target, ulong value, bool bigEndian)
 		{
 			if (bigEndian)
 			{
@@ -225,7 +315,7 @@ namespace holonsoft.FastProtocolConverter
 		}
 
 
-		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
+		private void WriteFieldValueToArray(ref ByteWriter result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
 		{
 			// Every branch reads the field through the strongly typed accessor, so no value type is
 			// boxed on the way out. It used to be one Getter call returning object up front.
@@ -240,10 +330,10 @@ namespace holonsoft.FastProtocolConverter
 					case DestinationType.None:
 					case DestinationType.Default:
 					case DestinationType.Int32:
-						Append32(result, unchecked((uint) enumValue), UseBigEndian);
+						Append32(ref result, unchecked((uint) enumValue), UseBigEndian);
 						break;
 					case DestinationType.Int16:
-						Append16(result, unchecked((ushort) (short) enumValue), UseBigEndian);
+						Append16(ref result, unchecked((ushort) (short) enumValue), UseBigEndian);
 						break;
 					case DestinationType.Byte:
 						result.Add((byte) enumValue);
@@ -264,14 +354,17 @@ namespace holonsoft.FastProtocolConverter
 
 			if (field.IsGuid)
 			{
-				var subArray = field.Get<Guid>(data).ToByteArray();
+				// written straight into the destination, ToByteArray() allocated a byte[16] for every
+				// Guid of every message
+				Span<byte> guidBytes = stackalloc byte[16];
+				field.Get<Guid>(data).TryWriteBytes(guidBytes);
 
 				// the reader reverses all 16 bytes when big endian is set, so the writer has to do
 				// the same, otherwise a Guid cannot be read back by this very converter.
 				// Note that this order is a full reversal of Guid.ToByteArray(), it is NOT RFC 4122.
-				if (UseBigEndian) Array.Reverse(subArray);
+				if (UseBigEndian) guidBytes.Reverse();
 
-				result.AddRange(subArray);
+				result.AddRange(guidBytes);
 				return;
 			}
 
@@ -279,42 +372,42 @@ namespace holonsoft.FastProtocolConverter
 			{
 				case TypeCode.Int32:
 				{
-					Append32(result, unchecked((uint) field.Get<int>(data)), UseBigEndian);
+					Append32(ref result, unchecked((uint) field.Get<int>(data)), UseBigEndian);
 					return;
 				}
 				case TypeCode.UInt32:
 				{
-					Append32(result, field.Get<uint>(data), UseBigEndian);
+					Append32(ref result, field.Get<uint>(data), UseBigEndian);
 					return;
 				}
 				case TypeCode.Int16:
 				{
-					Append16(result, unchecked((ushort) field.Get<short>(data)), UseBigEndian);
+					Append16(ref result, unchecked((ushort) field.Get<short>(data)), UseBigEndian);
 					return;
 				}
 				case TypeCode.UInt16:
 				{
-					Append16(result, field.Get<ushort>(data), UseBigEndian);
+					Append16(ref result, field.Get<ushort>(data), UseBigEndian);
 					return;
 				}
 				case TypeCode.Int64:
 				{
-					Append64(result, unchecked((ulong) field.Get<long>(data)), UseBigEndian);
+					Append64(ref result, unchecked((ulong) field.Get<long>(data)), UseBigEndian);
 					return;
 				}
 				case TypeCode.UInt64:
 				{
-					Append64(result, field.Get<ulong>(data), UseBigEndian);
+					Append64(ref result, field.Get<ulong>(data), UseBigEndian);
 					return;
 				}
 				case TypeCode.Single:
 				{
-					Append32(result, unchecked((uint) BitConverter.SingleToInt32Bits(field.Get<float>(data))), UseBigEndian);
+					Append32(ref result, unchecked((uint) BitConverter.SingleToInt32Bits(field.Get<float>(data))), UseBigEndian);
 					return;
 				}
 				case TypeCode.Double:
 				{
-					Append64(result, unchecked((ulong) BitConverter.DoubleToInt64Bits(field.Get<double>(data))), UseBigEndian);
+					Append64(ref result, unchecked((ulong) BitConverter.DoubleToInt64Bits(field.Get<double>(data))), UseBigEndian);
 					return;
 				}
 				case TypeCode.SByte:
@@ -322,7 +415,7 @@ namespace holonsoft.FastProtocolConverter
 					result.Add(unchecked((byte) field.Get<sbyte>(data)));
 					return;
 				case TypeCode.Decimal:
-					WriteDecimalToArray(result, field.Get<decimal>(data));
+					WriteDecimalToArray(ref result, field.Get<decimal>(data));
 					return;
 				case TypeCode.Byte:
 				{
@@ -352,11 +445,11 @@ namespace holonsoft.FastProtocolConverter
 
 					if (field.DateTimeAttribute.DateTimeByteFormat == DateTimeByteFormat.UnixTimeStamp32Bit)
 					{
-						Append32(result, unchecked((uint) (int) uts), UseBigEndian);
+						Append32(ref result, unchecked((uint) (int) uts), UseBigEndian);
 						return;
 					}
 
-					Append64(result, unchecked((ulong) uts), UseBigEndian);
+					Append64(ref result, unchecked((ulong) uts), UseBigEndian);
 					return;
 				}
 			}
@@ -365,7 +458,7 @@ namespace holonsoft.FastProtocolConverter
 			{
 				CalculateBufferForString(data, kvp, stringBuffer);
 
-				result.AddRange(stringBuffer);
+				result.AddRange(CollectionsMarshal.AsSpan(stringBuffer));
 				return;
 			}
 
