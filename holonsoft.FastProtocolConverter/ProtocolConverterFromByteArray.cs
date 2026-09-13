@@ -59,7 +59,7 @@ namespace holonsoft.FastProtocolConverter
 
 		private T ConvertFromByteArray(byte[] data)
 		{
-			data.Requires(nameof(data)).IsNotNull();
+			ThrowIfNull(data, nameof(data));
 
 			return ConvertFromByteArray(new ReadOnlySpan<byte>(data));
 		}
@@ -67,7 +67,7 @@ namespace holonsoft.FastProtocolConverter
 
 		private void ConvertFromByteArray(byte[] data, T instance)
 		{
-			data.Requires(nameof(data)).IsNotNull();
+			ThrowIfNull(data, nameof(data));
 
 			ConvertFromByteArray(new ReadOnlySpan<byte>(data), instance);
 		}
@@ -75,7 +75,7 @@ namespace holonsoft.FastProtocolConverter
 
 		private T ConvertFromByteArray(ReadOnlySpan<byte> data)
 		{
-			IsPrepared.Requires("Prepare()").IsTrue();
+			ThrowIfNotPrepared();
 
 			EnsureMinimumLength(data);
 
@@ -100,8 +100,8 @@ namespace holonsoft.FastProtocolConverter
 
 		private void ConvertFromByteArray(ReadOnlySpan<byte> data, T instance)
 		{
-			IsPrepared.Requires("Prepare()").IsTrue();
-			instance.Requires(nameof(instance)).IsNotNull();
+			ThrowIfNotPrepared();
+			ThrowIfNull(instance, nameof(instance));
 
 			EnsureMinimumLength(data);
 
