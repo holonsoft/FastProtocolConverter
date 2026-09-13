@@ -263,6 +263,88 @@ namespace holonsoft.FastProtocolConverter.Test
 		}
 
 
+		/// <summary>
+		/// A protocol definition may name its own culture for the range limits. That is safe because
+		/// the culture is declared in the source and travels with it, unlike the ambient culture of
+		/// the machine, which used to decide the meaning of "1.100" silently.
+		/// </summary>
+		[Fact]
+		public void TestExplicitRangeCultureIsHonoured()
+		{
+			var previous = CultureInfo.CurrentCulture;
+			try
+			{
+				// deliberately hostile ambient culture, it must not influence anything
+				CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+
+				var converter = CreateConverter<GermanRangeCulturePoco>(_logger);
+
+				var payload = converter.ConvertToByteArray(new GermanRangeCulturePoco { FloatField = 99f });
+
+				void SetToMin(FieldInfo field, out ConverterRangeViolationBehaviour chosen)
+					=> chosen = ConverterRangeViolationBehaviour.SetToMinValue;
+
+				converter.OnRangeViolation += SetToMin;
+				try
+				{
+					// "1,1" read with de-DE is one point one
+					converter.ConvertFromByteArray(payload).FloatField.ShouldBe(1.1f);
+				}
+				finally
+				{
+					converter.OnRangeViolation -= SetToMin;
+				}
+			}
+			finally
+			{
+				CultureInfo.CurrentCulture = previous;
+			}
+		}
+
+
+		/// <summary>
+		/// A typo in the culture name must fail loudly at Prepare time, not silently fall back to
+		/// something else and change what the range means.
+		/// </summary>
+		[Fact]
+		public void TestInvalidRangeCultureThrowsAtPrepare()
+		{
+			var converter = new ProtocolConverter<InvalidRangeCulturePoco>(_logger) as IProtocolConverter<InvalidRangeCulturePoco>;
+
+			var error = Should.Throw<ProtocolConverterException>(() => converter.Prepare());
+
+			error.Message.ShouldContain("not-a-culture");
+			error.Message.ShouldContain("RangeCulture");
+		}
+
+
+		/// <summary>
+		/// Without an explicit RangeCulture the invariant culture applies, whatever the machine is
+		/// configured to. This is the regression guard for the original bug.
+		/// </summary>
+		[Fact]
+		public void TestRangeCultureDefaultsToInvariantOnAnyMachine()
+		{
+			var previous = CultureInfo.CurrentCulture;
+			try
+			{
+				CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+
+				var converter = CreateConverter<DecimalAndSByteWithRangesPoco>(_logger);
+
+				// "-100.5" must stay minus one hundred point five, not minus one thousand and five
+				var roundTrip = converter.ConvertFromByteArray(converter.ConvertToByteArray(
+					new DecimalAndSByteWithRangesPoco { SByteField = 0, DecimalField = -100.5m }));
+
+				roundTrip.DecimalField.ShouldBe(-100.5m);
+			}
+			finally
+			{
+				CultureInfo.CurrentCulture = previous;
+			}
+		}
+
+
 		[Fact]
 		public void TestDecimalRangeViolationCanThrow()
 		{

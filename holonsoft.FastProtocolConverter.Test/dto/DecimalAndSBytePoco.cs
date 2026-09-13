@@ -50,4 +50,29 @@ namespace holonsoft.FastProtocolConverter.Test.dto
 		[ProtocolFieldRange(MinValue = "-100.5", MaxValue = "100.5", DefaultValue = "42.25")]
 		public decimal DecimalField;
 	}
+
+
+	/// <summary>
+	/// Names its range culture explicitly, so the limits are written German style with a comma.
+	/// The culture is part of the protocol definition and therefore identical on every machine.
+	/// </summary>
+	[ProtocolSetupArgument(RangeCulture = "de-DE")]
+	public class GermanRangeCulturePoco
+	{
+		[ProtocolField(StartPos = 0)]
+		[ProtocolFieldRange(MinValue = "1,1", MaxValue = "2,2", DefaultValue = "1,5")]
+		public float FloatField;
+
+		[ProtocolField(StartPos = 4)]
+		public int TrailingField;
+	}
+
+
+	[ProtocolSetupArgument(RangeCulture = "not-a-culture")]
+	public class InvalidRangeCulturePoco
+	{
+		[ProtocolField(StartPos = 0)]
+		[ProtocolFieldRange(MinValue = "1.1", MaxValue = "2.2")]
+		public float FloatField;
+	}
 }

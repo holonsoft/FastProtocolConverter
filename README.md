@@ -22,9 +22,25 @@ Support for
 | `Guid` | 16 | `Guid.ToByteArray()`, all 16 bytes reversed when `UseBigEndian` is set. Note that this is a full reversal and deliberately **not** RFC 4122 byte order |
 | `DateTime` | 4 or 8 | unix timestamp, see `ProtocolDateTimeFieldAttribute` |
 
-Range limits in `ProtocolFieldRangeAttribute` are written as strings and are always parsed with the
-**invariant culture**. `MinValue = "1.100"` therefore means one point one on every machine, regardless
-of the operating system locale.
+Range limits in `ProtocolFieldRangeAttribute` are written as strings and are parsed with the
+**invariant culture** by default. `MinValue = "1.100"` therefore means one point one on every machine,
+regardless of the operating system locale.
+
+If you prefer to write the limits in a different style, name the culture in the protocol definition:
+
+```c#
+    [ProtocolSetupArgument(RangeCulture = "de-DE")]
+    public class MyProtocol
+    {
+        [ProtocolField(StartPos = 0)]
+        [ProtocolFieldRange(MinValue = "1,1", MaxValue = "2,2")]
+        public float Temperature;
+    }
+```
+
+This is safe because the culture is declared in the source and travels with it. The culture of the
+machine is never consulted. An unknown culture name fails at `Prepare()` rather than falling back to
+something else, so a typo cannot silently change what a limit means.
 
 ### Error handling when reading
 

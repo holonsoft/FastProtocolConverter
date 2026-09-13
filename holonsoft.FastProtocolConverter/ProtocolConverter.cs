@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,32 @@ namespace holonsoft.FastProtocolConverter
         private readonly byte[] _converterHelper = new byte[4];
         private int _globalOffsetInByteArray;
 
+        /// <summary>
+        /// Culture for the string limits of ProtocolFieldRangeAttribute. Invariant unless the
+        /// protocol definition names a different one, never taken from the environment.
+        /// </summary>
+        private CultureInfo _rangeCulture = CultureInfo.InvariantCulture;
+
+
+        private CultureInfo ResolveRangeCulture(string cultureName)
+        {
+            if (string.IsNullOrWhiteSpace(cultureName)) return CultureInfo.InvariantCulture;
+
+            try
+            {
+                // predefinedOnly, otherwise ICU happily invents a custom culture for any string that
+                // merely looks like a language tag, and a typo would silently change what a limit means
+                return CultureInfo.GetCultureInfo(cultureName, predefinedOnly: true);
+            }
+            catch (CultureNotFoundException ex)
+            {
+                var msg = $"RangeCulture '{cultureName}' of {typeof(T).Name} is not a known culture name";
+                _logger?.Log(LogLevel.Critical, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} {msg}");
+
+                throw new ProtocolConverterException(msg, ex);
+            }
+        }
+
         public bool UseBigEndian { get; set; } = false;
 
         public bool IsPrepared { get; private set; } = false;
@@ -59,6 +86,7 @@ namespace holonsoft.FastProtocolConverter
 
                 UseBigEndian = argument.UseBigEndian;
 
+                _rangeCulture = ResolveRangeCulture(argument.RangeCulture);
             }
             else
             {
@@ -70,7 +98,7 @@ namespace holonsoft.FastProtocolConverter
                                  let attributes = field.GetCustomAttributes(typeof(ProtocolFieldAttribute), false)
                                  let attribute = (attributes.Length == 1) ? (ProtocolFieldAttribute)attributes[0] : null
                                  where attribute != null
-                                 select new ConverterFieldInfo<T>(field, attribute))
+                                 select new ConverterFieldInfo<T>(field, attribute, _rangeCulture))
             {
                 if (info.Attribute.IgnoreField)
                 {

@@ -21,77 +21,95 @@ namespace holonsoft.FastProtocolConverter.dto
         }
 
         public FieldRangeValue(ProtocolFieldRangeAttribute range)
-            : this(range.MinValue, range.MaxValue, range.DefaultValue)
+            : this(range, CultureInfo.InvariantCulture)
+        {
+        }
+
+        public FieldRangeValue(ProtocolFieldRangeAttribute range, CultureInfo culture)
+            : this(range.MinValue, range.MaxValue, range.DefaultValue, culture)
         {
         }
 
         public FieldRangeValue(string min, string max, string defaultValue)
+            : this(min, max, defaultValue, CultureInfo.InvariantCulture)
         {
+        }
+
+        /// <summary>
+        /// Parses the range limits with an explicitly given culture. The invariant culture is the
+        /// default, a different one is only used when the protocol definition names it via
+        /// <see cref="ProtocolSetupArgument.RangeCulture"/>. The culture is never taken from the
+        /// environment, otherwise the same definition would mean different things per machine.
+        /// </summary>
+        public FieldRangeValue(string min, string max, string defaultValue, CultureInfo culture)
+        {
+            culture ??= CultureInfo.InvariantCulture;
+
             var fieldTypeCode = Type.GetTypeCode(typeof(T));
 
             switch (fieldTypeCode)
             {
                 case TypeCode.Int64:
-                    MinValue = (T) (object) Int64.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) Int64.Parse(max, CultureInfo.InvariantCulture);
-                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) Int64.Parse(defaultValue, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) Int64.Parse(min, culture);
+                    MaxValue = (T) (object) Int64.Parse(max, culture);
+                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) Int64.Parse(defaultValue, culture);
                     break;
                 case TypeCode.UInt64:
-                    MinValue = (T) (object) UInt64.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) UInt64.Parse(max, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) UInt64.Parse(min, culture);
+                    MaxValue = (T) (object) UInt64.Parse(max, culture);
                     if (!string.IsNullOrWhiteSpace(defaultValue))
-                        DefaultValue = (T) (object) UInt64.Parse(defaultValue, CultureInfo.InvariantCulture);
+                        DefaultValue = (T) (object) UInt64.Parse(defaultValue, culture);
                     break;
                 case TypeCode.Int32:
-                    MinValue = (T) (object) int.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) int.Parse(max, CultureInfo.InvariantCulture);
-                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) int.Parse(defaultValue, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) int.Parse(min, culture);
+                    MaxValue = (T) (object) int.Parse(max, culture);
+                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) int.Parse(defaultValue, culture);
                     break;
                 case TypeCode.UInt32:
-                    MinValue = (T) (object) uint.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) uint.Parse(max, CultureInfo.InvariantCulture);
-                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) uint.Parse(defaultValue, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) uint.Parse(min, culture);
+                    MaxValue = (T) (object) uint.Parse(max, culture);
+                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) uint.Parse(defaultValue, culture);
                     break;
                 case TypeCode.Int16:
-                    MinValue = (T) (object) Int16.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) Int16.Parse(max, CultureInfo.InvariantCulture);
-                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) Int16.Parse(defaultValue, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) Int16.Parse(min, culture);
+                    MaxValue = (T) (object) Int16.Parse(max, culture);
+                    if (!string.IsNullOrWhiteSpace(defaultValue)) DefaultValue = (T) (object) Int16.Parse(defaultValue, culture);
                     break;
                 case TypeCode.UInt16:
-                    MinValue = (T) (object) UInt16.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) UInt16.Parse(max, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) UInt16.Parse(min, culture);
+                    MaxValue = (T) (object) UInt16.Parse(max, culture);
                     if (!string.IsNullOrWhiteSpace(defaultValue))
-                        DefaultValue = (T) (object) UInt16.Parse(defaultValue, CultureInfo.InvariantCulture);
+                        DefaultValue = (T) (object) UInt16.Parse(defaultValue, culture);
                     break;
                 case TypeCode.SByte:
-                    MinValue = (T) (object) SByte.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) SByte.Parse(max, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) SByte.Parse(min, culture);
+                    MaxValue = (T) (object) SByte.Parse(max, culture);
                     if (!string.IsNullOrWhiteSpace(defaultValue))
-                        DefaultValue = (T) (object) SByte.Parse(defaultValue, CultureInfo.InvariantCulture);
+                        DefaultValue = (T) (object) SByte.Parse(defaultValue, culture);
                     break;
                 case TypeCode.Byte:
-                    MinValue = (T) (object) Byte.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) Byte.Parse(max, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) Byte.Parse(min, culture);
+                    MaxValue = (T) (object) Byte.Parse(max, culture);
                     if (!string.IsNullOrWhiteSpace(defaultValue))
-                        DefaultValue = (T) (object) Byte.Parse(defaultValue, CultureInfo.InvariantCulture);
+                        DefaultValue = (T) (object) Byte.Parse(defaultValue, culture);
                     break;
                 case TypeCode.Decimal:
-                    MinValue = (T) (object) Decimal.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) Decimal.Parse(max, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) Decimal.Parse(min, culture);
+                    MaxValue = (T) (object) Decimal.Parse(max, culture);
                     if (!string.IsNullOrWhiteSpace(defaultValue))
-                        DefaultValue = (T) (object) Decimal.Parse(defaultValue, CultureInfo.InvariantCulture);
+                        DefaultValue = (T) (object) Decimal.Parse(defaultValue, culture);
                     break;
                 case TypeCode.Single:
-                    MinValue = (T) (object) Single.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) Single.Parse(max, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) Single.Parse(min, culture);
+                    MaxValue = (T) (object) Single.Parse(max, culture);
                     if (!string.IsNullOrWhiteSpace(defaultValue))
-                        DefaultValue = (T) (object) Single.Parse(defaultValue, CultureInfo.InvariantCulture);
+                        DefaultValue = (T) (object) Single.Parse(defaultValue, culture);
                     break;
                 case TypeCode.Double:
-                    MinValue = (T) (object) Double.Parse(min, CultureInfo.InvariantCulture);
-                    MaxValue = (T) (object) Double.Parse(max, CultureInfo.InvariantCulture);
+                    MinValue = (T) (object) Double.Parse(min, culture);
+                    MaxValue = (T) (object) Double.Parse(max, culture);
                     if (!string.IsNullOrWhiteSpace(defaultValue))
-                        DefaultValue = (T) (object) Double.Parse(defaultValue, CultureInfo.InvariantCulture);
+                        DefaultValue = (T) (object) Double.Parse(defaultValue, culture);
                     break;
                 default:
                     throw new ProtocolConverterException("No range support for type " + typeof(T).Name);

@@ -2,6 +2,7 @@
 using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Reflection;
@@ -141,8 +142,14 @@ namespace holonsoft.FastProtocolConverter.dto
 		public FieldRangeValue<float> RangeSingle { get; }
 		public FieldRangeValue<double> RangeDouble { get; }
 
-		public ConverterFieldInfo(FieldInfo fieldInfo, ProtocolFieldAttribute attribute)
+		/// <param name="rangeCulture">
+		/// Culture for the string limits of a ProtocolFieldRangeAttribute. Null means invariant,
+		/// which is the default. See ProtocolSetupArgument.RangeCulture.
+		/// </param>
+		public ConverterFieldInfo(FieldInfo fieldInfo, ProtocolFieldAttribute attribute, CultureInfo rangeCulture = null)
 		{
+			rangeCulture ??= CultureInfo.InvariantCulture;
+
 			FieldInfo = fieldInfo;
 
 			Setter = FastInvoke.BuildUntypedSetter<T>(fieldInfo);
@@ -268,36 +275,36 @@ namespace holonsoft.FastProtocolConverter.dto
 				switch (_fieldTypeCode)
 				{
 					case TypeCode.Int64:
-						RangeInt64 = new FieldRangeValue<Int64>(rawRangeAttribute);
+						RangeInt64 = new FieldRangeValue<Int64>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.UInt64:
-						RangeUInt64 = new FieldRangeValue<UInt64>(rawRangeAttribute);
+						RangeUInt64 = new FieldRangeValue<UInt64>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.Int32:
-						RangeInt = new FieldRangeValue<int>(rawRangeAttribute);
+						RangeInt = new FieldRangeValue<int>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.UInt32:
-						RangeUInt = new FieldRangeValue<uint>(rawRangeAttribute);
+						RangeUInt = new FieldRangeValue<uint>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.Int16:
-						RangeInt16 = new FieldRangeValue<Int16>(rawRangeAttribute);
+						RangeInt16 = new FieldRangeValue<Int16>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.UInt16:
-						RangeUInt16 = new FieldRangeValue<UInt16>(rawRangeAttribute);
+						RangeUInt16 = new FieldRangeValue<UInt16>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.SByte:
-						RangeSByte = new FieldRangeValue<sbyte>(rawRangeAttribute);
+						RangeSByte = new FieldRangeValue<sbyte>(rawRangeAttribute, rangeCulture);
 						break;
 					// NOTE: byte fields never reach this switch, the constructor returns early for them.
 					// Range support for byte is therefore not available, see the IsByte block above.
 					case TypeCode.Decimal:
-						RangeDecimal = new FieldRangeValue<decimal>(rawRangeAttribute);
+						RangeDecimal = new FieldRangeValue<decimal>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.Single:
-						RangeSingle = new FieldRangeValue<Single>(rawRangeAttribute);
+						RangeSingle = new FieldRangeValue<Single>(rawRangeAttribute, rangeCulture);
 						break;
 					case TypeCode.Double:
-						RangeDouble = new FieldRangeValue<Double>(rawRangeAttribute);
+						RangeDouble = new FieldRangeValue<Double>(rawRangeAttribute, rangeCulture);
 						break;
 				}
 			}
