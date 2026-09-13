@@ -18,6 +18,11 @@ namespace holonsoft.FastProtocolConverter
 
 		byte[] IProtocolConverter<T>.ConvertToByteArray(T data) => ConvertToByteArray(data);
 
+		bool IProtocolConverter<T>.TryConvertToByteArray(T data, Span<byte> destination, out int bytesWritten)
+			=> TryConvertToByteArray(data, destination, out bytesWritten);
+
+		int IProtocolConverter<T>.GetByteCount(T data) => GetByteCount(data);
+
 		event OnRangeViolationDelegate IProtocolConverter<T>.OnRangeViolation
 		{
 			add => this.OnRangeViolation += value;

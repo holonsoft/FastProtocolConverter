@@ -42,6 +42,11 @@ namespace holonsoft.FastProtocolConverter.Performance
 		private BenchmarkAdvancedPocoBigEndian _advancedBigEndianSource;
 		private byte[] _advancedPayload;
 		private byte[] _advancedBigEndianPayload;
+
+		/// <summary>
+		/// A buffer the caller owns and reuses, which is the point of TryConvertToByteArray.
+		/// </summary>
+		private byte[] _writeBuffer;
 		private int _frameOffset;
 		private int _frameLength;
 
@@ -131,6 +136,8 @@ namespace holonsoft.FastProtocolConverter.Performance
 
 			_advancedPayload = _advanced.ConvertToByteArray(_advancedSource);
 			_advancedBigEndianPayload = _advancedBigEndian.ConvertToByteArray(_advancedBigEndianSource);
+
+			_writeBuffer = new byte[256];
 		}
 
 
@@ -199,6 +206,14 @@ namespace holonsoft.FastProtocolConverter.Performance
 		[Benchmark(Description = "Write DateTime/Guid/decimal POCO, big endian")]
 		public byte[] WriteAdvancedBigEndian()
 			=> _advancedBigEndian.ConvertToByteArray(_advancedBigEndianSource);
+
+
+		[Benchmark(Description = "Write 38 byte POCO into a reused buffer")]
+		public int WriteIntoOwnBuffer()
+		{
+			_littleEndian.TryConvertToByteArray(_littleSource, _writeBuffer, out var written);
+			return written;
+		}
 
 
 		[Benchmark(Description = "Read  POCO with fixed length string")]

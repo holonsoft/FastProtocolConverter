@@ -88,7 +88,7 @@ namespace holonsoft.FastProtocolConverter
 			// just a simple protocol in terms of fixed length fields
 			if (_fieldListSeqPos.Count == 0)
 			{
-				foreach (var kvp in _fieldListFixPos)
+				foreach (var kvp in _fixPosFields)
 				{
 					SetFieldValue(result, kvp, -1, data);
 				}
@@ -114,7 +114,7 @@ namespace holonsoft.FastProtocolConverter
 			// just a simple protocol in terms of fixed length fields
 			if (_fieldListSeqPos.Count == 0)
 			{
-				foreach (var kvp in _fieldListFixPos)
+				foreach (var kvp in _fixPosFields)
 				{
 					SetFieldValue(result, kvp, -1, data);
 				}
@@ -133,7 +133,7 @@ namespace holonsoft.FastProtocolConverter
 			var lengthOfData = data.Length;
 
 			var actualPosition = _globalOffsetInByteArray;
-			foreach (var kvp in _fieldListSeqPos)
+			foreach (var kvp in _seqPosFields)
 			{
 				if (actualPosition > lengthOfData)
 				{
