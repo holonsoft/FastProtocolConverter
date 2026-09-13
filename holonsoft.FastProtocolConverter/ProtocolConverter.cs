@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using holonsoft.FluentConditions;
 using holonsoft.FastProtocolConverter.Abstractions.Attributes;
@@ -84,6 +85,45 @@ namespace holonsoft.FastProtocolConverter
         {
             _logger = logger;
         }
+
+        /// <summary>
+        /// The guard clauses of both conversion directions.
+        ///
+        /// They used to go through the fluent condition chain of holonsoft.FluentConditions, which
+        /// costs roughly 50 ns per message on a 38 byte frame, about 45 percent of a whole read.
+        /// That package is published as a non optimized build, so the JIT neither optimizes nor
+        /// inlines anything inside it, and a guard clause on a per message path is the one place
+        /// where that is not affordable. Prepare() still uses the fluent version, it runs once.
+        ///
+        /// The exception types are exactly the ones FluentConditions threw, so code that catches
+        /// them keeps working, and the original message text is kept as the message.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ThrowIfNotPrepared()
+        {
+            if (!IsPrepared) ThrowNotPrepared();
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ThrowIfNull<TValue>(TValue value, string parameterName)
+            where TValue : class
+        {
+            if (value is null) ThrowArgumentNull(parameterName);
+        }
+
+
+        // kept out of the inlined guard on purpose, so the fast path is a compare and a branch and
+        // nothing else ends up in the caller
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowNotPrepared()
+            => throw new ArgumentOutOfRangeException("Prepare()", "'Prepare()' is false!");
+
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ThrowArgumentNull(string parameterName)
+            => throw new ArgumentNullException(parameterName, $"'{parameterName}' is null!");
+
 
         private void Prepare()
         {

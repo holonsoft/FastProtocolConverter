@@ -189,6 +189,96 @@ character above 0x7F and would silently change the wire format.
 Byte order is free now, in both directions. What is left is structural: the result array itself, the
 List and its backing array on the write side, and the POCO on the read side.
 
+## Phase 4, step 1: reading straight out of a ReadOnlySpan
+
+The converter could only be handed a `byte[]`. Bytes that arrive anywhere else, a socket receive
+buffer, a rented buffer, a slice of a larger frame, had to be copied into a fresh array first, and
+that copy is bigger than everything the converter allocates per message.
+
+`ConvertFromByteArray` now has `ReadOnlySpan<byte>` overloads in both shapes. The span version is
+the implementation, the array versions keep their null check and delegate to it.
+
+Reading a 38 byte frame that sits at a non zero offset inside a larger receive buffer:
+
+| | time | alloc |
+|---|---:|---:|
+| copy into an array first | 132.05 ns | 168 B |
+| span, no copy            |  75.13 ns | 104 B |
+| span, reused instance    |  77.98 ns |  48 B |
+
+Roughly 50 ns of that gap turned out not to be the copy at all but the guard clause the array
+overload runs and the span overload does not, which is what the next step is about.
+
+## Phase 4, step 2: the guard clauses
+
+Both conversion directions opened with `holonsoft.FluentConditions`:
+
+```csharp
+IsPrepared.Requires("Prepare()").IsTrue();
+data.Requires(nameof(data)).IsNotNull();
+```
+
+That package is **published as a non optimized build**. Its assembly carries
+`DebuggableAttribute` with `IsJITOptimizerDisabled`, so the JIT neither optimizes nor inlines
+anything inside it, in every process that consumes it. BenchmarkDotNet refuses to benchmark
+against such a reference at all, which is how it was found.
+
+A fluent validator chain is the wrong tool for a per message guard clause regardless of how it was
+built, so both directions now use a plain compare with the throw in a separate non inlined method.
+The exception types are unchanged (`ArgumentNullException`, `ArgumentOutOfRangeException`), so
+code that catches them keeps working, and the original message text is kept. `Prepare()` still
+uses the fluent version, it runs once per converter.
+
+A/B of the same tree with and without the change, back to back:
+
+| Method | fluent guards | plain guards | delta |
+|---|---:|---:|---:|
+| Read  from buffer, copy first | 131.69 ns |  72.42 ns | **-45.0%** |
+| Read  from buffer, span       |  74.09 ns |  69.63 ns |  -6.0% |
+| Read  from buffer, span reuse |  75.58 ns |  60.55 ns | -19.9% |
+| Read  LE                      | 133.07 ns |  68.17 ns | **-48.8%** |
+| Read  BE                      | 125.90 ns |  67.37 ns | **-46.5%** |
+| Read  reused                  | 125.75 ns |  59.59 ns | **-52.6%** |
+| Write LE                      | 129.14 ns | 110.74 ns | -14.2% |
+| Write BE                      | 131.19 ns | 112.02 ns | -14.6% |
+| Read  string                  |  66.76 ns |  37.70 ns | **-43.5%** |
+| Write string                  | 138.26 ns | 119.97 ns | -13.2% |
+
+Allocation is unchanged in every row, the validator was a struct.
+
+What the A/B shows is that every row improved and that reading gained far more than writing. What
+it does not show is why. Both directions removed exactly the same two guards, one on a reference
+type and one on `bool`, yet reading saved about 65 ns and writing about 18 ns. So the saving is
+not simply the cost of the two calls, and no measurement here isolates the rest of it. The likely
+remainder is an inlining cascade, an opaque call at the top of a method blocks the JIT from
+inlining what follows, and the read path had more to gain from that than the write path. That is
+a hypothesis, not a result.
+
+The reads are now faster than the write path for the first time in this library's history.
+
+## Cumulative against the shipped 3.6.1 code (bcea658)
+
+| Method | before | now | time | alloc |
+|---|---:|---:|---:|---|
+| Read  LE      | 118.09 ns |  68.17 ns | **-42.3%** |  344 -> 104 B |
+| Read  BE      | 146.21 ns |  67.37 ns | **-53.9%** |  568 -> 104 B |
+| Read  reused  | 115.58 ns |  59.59 ns | **-48.4%** |  288 ->  48 B |
+| Write LE      | 245.33 ns | 110.74 ns | **-54.9%** |  888 -> 208 B |
+| Write BE      | 376.86 ns | 112.02 ns | **-70.3%** | 1528 -> 208 B |
+| Read  string  |  73.96 ns |  37.70 ns | **-49.0%** |  288 -> 208 B |
+| Write string  | 166.05 ns | 119.97 ns | **-27.8%** |  384 -> 296 B |
+
+Reading a frame out of a receive buffer without copying it first is 132.05 ns -> 72.42 ns against
+what a caller had to write before, and 60.55 ns into a reused instance.
+
+## A note for the other holonsoft packages
+
+`holonsoft.FluentConditions` 3.0.1, `holonsoft.FluentDateTime` 2.1.1 and `holonsoft.Utils` 1.10.1
+are all published to NuGet as non optimized builds. Every one of them sets
+`GeneratePackageOnBuild`, so the `.nupkg` contains whatever configuration was built last, and a
+build from the IDE defaults to Debug. This library packs with an explicit `-c Release` in
+`publish.yml`, so it is not affected itself.
+
 ## Targets for v4
 
 1. Replace `FieldInfo.GetValue` with the compiled getter that already exists unused in `FastInvoke`.

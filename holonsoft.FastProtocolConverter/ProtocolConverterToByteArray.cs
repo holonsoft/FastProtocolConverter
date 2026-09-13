@@ -18,8 +18,8 @@ namespace holonsoft.FastProtocolConverter
 	{
 		private byte[] ConvertToByteArray(T data)
 		{
-			IsPrepared.Requires("Prepare()").IsTrue();
-			data.Requires(nameof(data)).IsNotNull();
+			ThrowIfNotPrepared();
+			ThrowIfNull(data, nameof(data));
 
 			// sized up front, the backing array used to double its way up from nothing
 			var result = new List<byte>(_writeSizeEstimate);
