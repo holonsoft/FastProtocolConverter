@@ -109,24 +109,30 @@ namespace holonsoft.FastProtocolConverter
                 throw new ProtocolConverterException(msg);
             }
 
-            var nextPosition = -1;
+            // Overlap detection and the minimum length both need the size a field really occupies.
+            // ExpectedFieldSize reports -1 for strings and enums and 1 for padding bytes, which made
+            // the old calculation meaningless as soon as a protocol contained one of them.
+            var nextPosition = 0;
 
             foreach (var kvp in _fieldListFixPos)
             {
                 if (kvp.Key < nextPosition)
                 {
-                    var msg = "Overlapping fields are not allowed";
+                    var msg = $"Overlapping fields are not allowed, '{kvp.Value.FieldName}' starts at {kvp.Key} but the previous field ends at {nextPosition}";
                     _logger?.Log(LogLevel.Critical, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} {msg}");
 
                     throw new ProtocolConverterException(msg);
                 }
 
-                nextPosition = kvp.Key + kvp.Value.ExpectedFieldSize;
+                var effectiveSize = kvp.Value.EffectiveFieldSize;
 
-                _totalMinLength = nextPosition;
+                // a variable length string has no size yet, it is only legal in a sequence protocol
+                if (effectiveSize < 0) continue;
+
+                nextPosition = kvp.Key + effectiveSize;
+
+                if (nextPosition > _totalMinLength) _totalMinLength = nextPosition;
             }
-
-            _totalMinLength -= 1;
 
             if (_fieldListSeqPos.Count == 0)
             {
@@ -191,6 +197,28 @@ namespace holonsoft.FastProtocolConverter
 
                 expectedSequenceNumber++;
             }
+
+            if (_fieldListSeqPos.Count > 0)
+            {
+                // A sequence protocol had no minimum length at all before, so a far too short frame
+                // was only noticed when a read ran past the end of the array. Variable length strings
+                // contribute nothing here, everything else is known up front.
+                var minimumOfSequence = 0;
+
+                foreach (var kvp in _fieldListSeqPos)
+                {
+                    var effectiveSize = kvp.Value.EffectiveFieldSize;
+
+                    if (effectiveSize > 0) minimumOfSequence += effectiveSize;
+                }
+
+                _totalMinLength = minimumOfSequence;
+            }
+
+            // the leading bytes the converter skips belong to the frame as well
+            _totalMinLength += _globalOffsetInByteArray;
+
+            _logger?.Log(LogLevel.Trace, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} minimum length of byte array is {_totalMinLength}");
 
             IsPrepared = true;
         }

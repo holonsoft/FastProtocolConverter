@@ -14,6 +14,16 @@ namespace holonsoft.FastProtocolConverter.Performance
 
 		static void Main(string[] args)
 		{
+			// BenchmarkDotNet is the baseline for the v4 performance work, the hand rolled
+			// Stopwatch loops below are kept for a quick smoke measurement.
+			if (args.Length > 0 && args[0] == "--benchmark")
+			{
+				BenchmarkDotNet.Running.BenchmarkSwitcher
+					.FromAssembly(typeof(Program).Assembly)
+					.Run(args[1..]);
+				return;
+			}
+
 			if (!File.Exists("holonsoft.FastProtocolConverter.Abstractions.dll"))
 			{
 				throw new ApplicationException("Why to the hell ...");
