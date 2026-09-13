@@ -174,19 +174,23 @@ namespace holonsoft.FastProtocolConverter
 
 			if (strAttr.IsFixedLengthString)
 			{
-				if (effectiveLength < kvp.Value.StrAttribute.StringMaxLengthInByteArray)
+				var declaredLength = strAttr.StringMaxLengthInByteArray;
+
+				while (effectiveLength < declaredLength)
 				{
-					while (effectiveLength < kvp.Value.StrAttribute.StringMaxLengthInByteArray)
-					{
-						stringBuffer.AddRange(fillupChar);
-						effectiveLength += fillupChar.Length;
-					}
+					stringBuffer.AddRange(fillupChar);
+					effectiveLength += fillupChar.Length;
 				}
-				else
+
+				// One truncation for both branches, and it is not only for values that are too long.
+				// The fill character can be wider than one byte, for example any character under the
+				// unicode encoder, and then the padding loop above overshoots whenever the declared
+				// length is not a multiple of that width. That used to grow the frame by a byte and
+				// shift every field behind the string, silently, because the buffer it was written
+				// into could grow. A fixed length field is exactly its declared length, always.
+				if (stringBuffer.Count > declaredLength)
 				{
-					stringBuffer.RemoveRange(kvp.Value.StrAttribute.StringMaxLengthInByteArray,
-						stringBuffer.Count - kvp.Value.StrAttribute.StringMaxLengthInByteArray);
-					effectiveLength = kvp.Value.StrAttribute.StringMaxLengthInByteArray;
+					stringBuffer.RemoveRange(declaredLength, stringBuffer.Count - declaredLength);
 				}
 
 				return;

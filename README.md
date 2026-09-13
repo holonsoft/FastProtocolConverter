@@ -469,6 +469,14 @@ big endian Guid did not survive a round trip through this library. Both sides ag
 persisted big endian Guid frames written by 3.x, they were written little endian and will now read
 differently. Little endian protocols are unaffected.
 
+**5. A fixed length string field is now really its declared length.**
+If the fill character costs more than one byte, which is any character under the unicode encoder,
+and the declared length is not a multiple of that width, the padding used to overshoot. An eleven
+byte unicode field was written as twelve, so every field behind it moved one byte along and the
+frame could not be read back by this very converter. Frames of such a protocol written by 3.x are
+malformed and will not match what 4.0 writes. Protocols whose fill character is one byte wide, or
+whose declared length divides by the fill width, are unaffected, which is almost all of them.
+
 ### Fixed in 4.0
 
 * **A prepared converter is now thread safe.** Both directions kept per message state on the shared
@@ -479,6 +487,7 @@ differently. Little endian protocols are unaffected.
   `NotImplementedException`.
 * **The minimum length check is real.** It reported 14 bytes for a 272 byte protocol, so lengths
   between 14 and 271 slipped past the guard.
+* **A fixed length string can no longer overflow its field**, see point 5 above.
 
 ### And it is quite a bit faster
 
