@@ -240,7 +240,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
+			var fieldTypeCode = kvp.Value.FieldTypeCode;
 
 			switch (fieldTypeCode)
 			{

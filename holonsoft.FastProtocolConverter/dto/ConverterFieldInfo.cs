@@ -131,7 +131,11 @@ namespace holonsoft.FastProtocolConverter.dto
 		/// </summary>
 		public string FieldName => FieldInfo.Name;
 
-		private readonly TypeCode _fieldTypeCode;
+		/// <summary>
+		/// TypeCode of the underlying field, resolved once. Type.GetTypeCode used to be called for
+		/// every field of every message in both directions.
+		/// </summary>
+		public TypeCode FieldTypeCode { get; }
 
 		public bool UseRangeCheck { get; } = false;
 
@@ -156,6 +160,7 @@ namespace holonsoft.FastProtocolConverter.dto
 			rangeCulture ??= CultureInfo.InvariantCulture;
 
 			FieldInfo = fieldInfo;
+			FieldTypeCode = Type.GetTypeCode(fieldInfo.FieldType);
 
 			Setter = FastInvoke.BuildUntypedSetter<T>(fieldInfo);
 			Getter = FastInvoke.BuildUntypedGetter<T>(fieldInfo);
@@ -276,9 +281,7 @@ namespace holonsoft.FastProtocolConverter.dto
 
 				var rawRangeAttribute = (ProtocolFieldRangeAttribute) r;
 
-				_fieldTypeCode = Type.GetTypeCode(FieldInfo.FieldType);
-
-				switch (_fieldTypeCode)
+				switch (FieldTypeCode)
 				{
 					case TypeCode.Int64:
 						RangeInt64 = new FieldRangeValue<Int64>(rawRangeAttribute, rangeCulture);
@@ -319,7 +322,7 @@ namespace holonsoft.FastProtocolConverter.dto
 
 		public bool IsInRange(object val)
 		{
-			switch (_fieldTypeCode)
+			switch (FieldTypeCode)
 			{
 				case TypeCode.Int64:
 					return RangeInt64.IsInRange((long) val);

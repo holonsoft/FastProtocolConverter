@@ -176,7 +176,7 @@ namespace holonsoft.FastProtocolConverter
 
 		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
 		{
-			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
+			var fieldTypeCode = kvp.Value.FieldTypeCode;
 
 			// compiled accessor, this used to be FieldInfo.GetValue per field per message
 			var fieldValue = kvp.Value.Getter(data);
