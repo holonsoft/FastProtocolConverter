@@ -765,64 +765,40 @@ namespace holonsoft.FastProtocolConverter
 		{
 			if (kvp.Value.IsEnum)
 			{
+				// The raw value is assembled in a local. It used to be written into a byte[4] that
+				// lived on the converter, which made two threads sharing one prepared converter
+				// overwrite each other and produce a wrong enum value without any error.
+				// Multi byte values are zero extended, exactly as the old scratch buffer did.
+				int rawValue;
 				int returnVal;
 
 				switch (kvp.Value.Attribute.TypeInByteArray)
 				{
 					case DestinationType.Byte:
-						_converterHelper[0] = data[pos];
-						_converterHelper[1] = 0;
-						_converterHelper[2] = 0;
-						_converterHelper[3] = 0;
+						rawValue = data[pos];
 						returnVal = 1;
 						break;
 					case DestinationType.Int16:
-						if (UseBigEndian)
-						{
-							_converterHelper[0] = data[pos + 1];
-							_converterHelper[1] = data[pos];
-							_converterHelper[2] = 0;
-							_converterHelper[3] = 0;
-						}
-						else
-						{
-							_converterHelper[0] = data[pos];
-							_converterHelper[1] = data[pos + 1];
-							_converterHelper[2] = 0;
-							_converterHelper[3] = 0;
-						}
-
+						rawValue = UseBigEndian
+							? (data[pos] << 8) | data[pos + 1]
+							: (data[pos + 1] << 8) | data[pos];
 						returnVal = 2;
 						break;
 					case DestinationType.Int32:
 					case DestinationType.Default:
-						if (UseBigEndian)
-						{
-							_converterHelper[3] = data[pos];
-							_converterHelper[2] = data[pos + 1];
-							_converterHelper[1] = data[pos + 2];
-							_converterHelper[0] = data[pos + 3];
-						}
-						else
-						{
-							_converterHelper[0] = data[pos];
-							_converterHelper[1] = data[pos + 1];
-							_converterHelper[2] = data[pos + 2];
-							_converterHelper[3] = data[pos + 3];
-						}
-
+						rawValue = UseBigEndian
+							? (data[pos] << 24) | (data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3]
+							: data[pos] | (data[pos + 1] << 8) | (data[pos + 2] << 16) | (data[pos + 3] << 24);
 						returnVal = 4;
 						break;
 					default:
 						throw new ProtocolConverterException("Conversion for enum " + kvp.Value.FieldName + " not supported");
 				}
 
-				var x = (BitConverter.ToInt32(_converterHelper, 0)).ToString(CultureInfo.InvariantCulture);
-				var value = Enum.Parse(kvp.Value.FieldInfo.FieldType, x);
+				// Enum.ToObject instead of formatting the number and parsing it back, which
+				// allocated a string for every enum field of every message
+				kvp.Value.Setter(result, Enum.ToObject(kvp.Value.FieldInfo.FieldType, rawValue));
 
-
-				//field.SetValue(result, value);
-				kvp.Value.Setter(result, value);
 				return returnVal;
 			}
 

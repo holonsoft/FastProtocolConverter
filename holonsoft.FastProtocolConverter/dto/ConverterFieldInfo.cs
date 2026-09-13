@@ -125,7 +125,6 @@ namespace holonsoft.FastProtocolConverter.dto
 		/// </summary>
 		public string FieldName => FieldInfo.Name;
 
-		public List<byte> PartialBuffer = new List<byte>();
 		private readonly TypeCode _fieldTypeCode;
 
 		public bool UseRangeCheck { get; } = false;

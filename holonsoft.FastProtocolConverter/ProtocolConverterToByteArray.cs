@@ -22,20 +22,26 @@ namespace holonsoft.FastProtocolConverter
 
 			var result = new List<byte>();
 
+			// Scratch buffer for string encoding. It is local to this call on purpose: it used to be
+			// a List<byte> on the shared ConverterFieldInfo, so two threads serialising different
+			// values through one prepared converter produced mixed up or truncated output.
+			// A protocol without strings allocates nothing here.
+			var stringBuffer = _hasStringFields ? new List<byte>(_stringBufferCapacity) : null;
+
 			if (_fieldListSeqPos.Count == 0)
 			{
 				foreach (var kvp in _fieldListFixPos)
 				{
-					WriteFieldValueToArray(result, kvp, data);
+					WriteFieldValueToArray(result, kvp, data, stringBuffer);
 				}
 			}
 			else
 			{
-				CalculateStringForWriting(data);
+				CalculateStringForWriting(data, stringBuffer);
 
 				foreach (var kvp in _fieldListSeqPos)
 				{
-					WriteFieldValueToArray(result, kvp, data);
+					WriteFieldValueToArray(result, kvp, data, stringBuffer);
 				}
 			}
 
@@ -43,26 +49,25 @@ namespace holonsoft.FastProtocolConverter
 		}
 
 
-		private void CalculateStringForWriting(T data)
+		private void CalculateStringForWriting(T data, List<byte> stringBuffer)
 		{
 			// calc length fields for strings
 			foreach (var kvp in _fieldListSeqPos)
 			{
 				if (!kvp.Value.IsString) continue;
 
-				CalculateBufferForString(data, kvp);
-				continue;
+				CalculateBufferForString(data, kvp, stringBuffer);
 			}
 		}
 
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private void CalculateBufferForString(T data, KeyValuePair<int, ConverterFieldInfo<T>> kvp)
+		private void CalculateBufferForString(T data, KeyValuePair<int, ConverterFieldInfo<T>> kvp, List<byte> stringBuffer)
 		{
 			var converterFieldInfo = kvp.Value;
 			var strAttr = converterFieldInfo.StrAttribute;
 
-			kvp.Value.PartialBuffer.Clear();
+			stringBuffer.Clear();
 
 			byte[] fillupChar = null;
 
@@ -71,16 +76,16 @@ namespace holonsoft.FastProtocolConverter
 			{
 				case SupportedEncoder.None:
 				case SupportedEncoder.Default:
-					kvp.Value.PartialBuffer.AddRange(Encoding.ASCII.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
+					stringBuffer.AddRange(Encoding.ASCII.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
 					fillupChar = Encoding.ASCII.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
 					break;
 				case SupportedEncoder.UnicodeEncoder:
-					kvp.Value.PartialBuffer.AddRange(Encoding.Unicode.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
+					stringBuffer.AddRange(Encoding.Unicode.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
 					fillupChar = Encoding.Unicode.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
 					break;
 			}
 
-			int effectiveLength = kvp.Value.PartialBuffer.Count;
+			int effectiveLength = stringBuffer.Count;
 
 			if (strAttr.IsFixedLengthString)
 			{
@@ -88,14 +93,14 @@ namespace holonsoft.FastProtocolConverter
 				{
 					while (effectiveLength < kvp.Value.StrAttribute.StringMaxLengthInByteArray)
 					{
-						kvp.Value.PartialBuffer.AddRange(fillupChar);
+						stringBuffer.AddRange(fillupChar);
 						effectiveLength += fillupChar.Length;
 					}
 				}
 				else
 				{
-					kvp.Value.PartialBuffer.RemoveRange(kvp.Value.StrAttribute.StringMaxLengthInByteArray,
-						kvp.Value.PartialBuffer.Count - kvp.Value.StrAttribute.StringMaxLengthInByteArray);
+					stringBuffer.RemoveRange(kvp.Value.StrAttribute.StringMaxLengthInByteArray,
+						stringBuffer.Count - kvp.Value.StrAttribute.StringMaxLengthInByteArray);
 					effectiveLength = kvp.Value.StrAttribute.StringMaxLengthInByteArray;
 				}
 
@@ -169,7 +174,7 @@ namespace holonsoft.FastProtocolConverter
 		}
 
 
-		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data)
+		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
 		{
 			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
 			var field = kvp.Value.FieldInfo;
@@ -315,9 +320,9 @@ namespace holonsoft.FastProtocolConverter
 
 			if (kvp.Value.IsString)
 			{
-				CalculateBufferForString(data, kvp);
+				CalculateBufferForString(data, kvp, stringBuffer);
 
-				result.AddRange(kvp.Value.PartialBuffer);
+				result.AddRange(stringBuffer);
 				return;
 			}
 

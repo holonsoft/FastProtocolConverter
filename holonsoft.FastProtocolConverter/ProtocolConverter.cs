@@ -27,10 +27,15 @@ namespace holonsoft.FastProtocolConverter
         private readonly SortedList<int, ConverterFieldInfo<T>> _fieldListSeqPos = new SortedList<int, ConverterFieldInfo<T>>();
         private readonly SortedList<string, ConverterFieldInfo<T>> _fieldListByName = new SortedList<string, ConverterFieldInfo<T>>();
 
-        private readonly Dictionary<Type, object> _converterList = new Dictionary<Type, object>();
 
-        private readonly byte[] _converterHelper = new byte[4];
         private int _globalOffsetInByteArray;
+
+        /// <summary>
+        /// A protocol without string fields needs no scratch buffer for writing at all, and one with
+        /// strings can size the buffer up front instead of letting it grow from four bytes.
+        /// </summary>
+        private bool _hasStringFields;
+        private int _stringBufferCapacity;
 
         /// <summary>
         /// Culture for the string limits of ProtocolFieldRangeAttribute. Invariant unless the
@@ -245,6 +250,20 @@ namespace holonsoft.FastProtocolConverter
 
             // the leading bytes the converter skips belong to the frame as well
             _totalMinLength += _globalOffsetInByteArray;
+
+            var stringFields = _fieldListFixPos.Values
+                .Concat(_fieldListSeqPos.Values)
+                .Where(x => x.IsString)
+                .ToList();
+
+            _hasStringFields = stringFields.Count > 0;
+
+            if (_hasStringFields)
+            {
+                // a variable length string has no known size, 64 is a starting point that avoids the
+                // first few doublings without wasting much
+                _stringBufferCapacity = stringFields.Max(x => x.EffectiveFieldSize > 0 ? x.EffectiveFieldSize : 64);
+            }
 
             _logger?.Log(LogLevel.Trace, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} minimum length of byte array is {_totalMinLength}");
 
