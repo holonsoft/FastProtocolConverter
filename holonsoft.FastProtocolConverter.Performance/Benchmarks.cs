@@ -35,6 +35,13 @@ namespace holonsoft.FastProtocolConverter.Performance
 		/// frame out of here into its own byte[] before the converter would look at it.
 		/// </summary>
 		private byte[] _receiveBuffer;
+
+		private IProtocolConverter<BenchmarkAdvancedPoco> _advanced;
+		private IProtocolConverter<BenchmarkAdvancedPocoBigEndian> _advancedBigEndian;
+		private BenchmarkAdvancedPoco _advancedSource;
+		private BenchmarkAdvancedPocoBigEndian _advancedBigEndianSource;
+		private byte[] _advancedPayload;
+		private byte[] _advancedBigEndianPayload;
 		private int _frameOffset;
 		private int _frameLength;
 
@@ -96,6 +103,34 @@ namespace holonsoft.FastProtocolConverter.Performance
 			_frameLength = _littlePayload.Length;
 			_receiveBuffer = new byte[_frameOffset + _frameLength + 5];
 			_littlePayload.CopyTo(_receiveBuffer, _frameOffset);
+
+			_advanced = new ProtocolConverter<BenchmarkAdvancedPoco>(null);
+			_advanced.Prepare();
+
+			_advancedBigEndian = new ProtocolConverter<BenchmarkAdvancedPocoBigEndian>(null);
+			_advancedBigEndian.Prepare();
+
+			var stamp = new DateTime(2026, 9, 13, 21, 47, 11, DateTimeKind.Utc);
+			var guid = new Guid("0f8fad5b-d9cb-469f-a165-70867728950e");
+
+			_advancedSource = new BenchmarkAdvancedPoco
+			{
+				DateTime32Field = stamp,
+				DateTime64Field = stamp,
+				GuidField = guid,
+				DecimalField = -12345.6789m,
+			};
+
+			_advancedBigEndianSource = new BenchmarkAdvancedPocoBigEndian
+			{
+				DateTime32Field = stamp,
+				DateTime64Field = stamp,
+				GuidField = guid,
+				DecimalField = -12345.6789m,
+			};
+
+			_advancedPayload = _advanced.ConvertToByteArray(_advancedSource);
+			_advancedBigEndianPayload = _advancedBigEndian.ConvertToByteArray(_advancedBigEndianSource);
 		}
 
 
@@ -146,6 +181,26 @@ namespace holonsoft.FastProtocolConverter.Performance
 			=> _bigEndian.ConvertToByteArray(_bigSource);
 
 
+		[Benchmark(Description = "Read  DateTime/Guid/decimal POCO, little endian")]
+		public BenchmarkAdvancedPoco ReadAdvanced()
+			=> _advanced.ConvertFromByteArray(_advancedPayload);
+
+
+		[Benchmark(Description = "Read  DateTime/Guid/decimal POCO, big endian")]
+		public BenchmarkAdvancedPocoBigEndian ReadAdvancedBigEndian()
+			=> _advancedBigEndian.ConvertFromByteArray(_advancedBigEndianPayload);
+
+
+		[Benchmark(Description = "Write DateTime/Guid/decimal POCO, little endian")]
+		public byte[] WriteAdvanced()
+			=> _advanced.ConvertToByteArray(_advancedSource);
+
+
+		[Benchmark(Description = "Write DateTime/Guid/decimal POCO, big endian")]
+		public byte[] WriteAdvancedBigEndian()
+			=> _advancedBigEndian.ConvertToByteArray(_advancedBigEndianSource);
+
+
 		[Benchmark(Description = "Read  POCO with fixed length string")]
 		public BenchmarkStringPoco ReadWithString()
 			=> _withStrings.ConvertFromByteArray(_stringPayload);
@@ -154,6 +209,42 @@ namespace holonsoft.FastProtocolConverter.Performance
 		[Benchmark(Description = "Write POCO with fixed length string")]
 		public byte[] WriteWithString()
 			=> _withStrings.ConvertToByteArray(_stringSource);
+	}
+
+
+	/// <summary>
+	/// The types that have their own handler and that no other benchmark POCO covers: DateTime in
+	/// both unix formats, Guid and decimal. Without this the DateTime path, which reaches into
+	/// holonsoft.FluentDateTime, and the Guid and decimal paths were never measured at all.
+	/// </summary>
+	public class BenchmarkAdvancedPoco
+	{
+		[ProtocolField(StartPos = 0)]
+		[ProtocolDateTimeField(DateTimeKind = DateTimeKind.Utc, DateTimeByteFormat = DateTimeByteFormat.UnixTimeStamp32Bit)]
+		public DateTime DateTime32Field;
+
+		[ProtocolField(StartPos = 4)]
+		[ProtocolDateTimeField(DateTimeKind = DateTimeKind.Utc, DateTimeByteFormat = DateTimeByteFormat.UnixTimeStamp64Bit)]
+		public DateTime DateTime64Field;
+
+		[ProtocolField(StartPos = 12)] public Guid GuidField;
+		[ProtocolField(StartPos = 28)] public decimal DecimalField;
+	}
+
+
+	[ProtocolSetupArgument(UseBigEndian = true)]
+	public class BenchmarkAdvancedPocoBigEndian
+	{
+		[ProtocolField(StartPos = 0)]
+		[ProtocolDateTimeField(DateTimeKind = DateTimeKind.Utc, DateTimeByteFormat = DateTimeByteFormat.UnixTimeStamp32Bit)]
+		public DateTime DateTime32Field;
+
+		[ProtocolField(StartPos = 4)]
+		[ProtocolDateTimeField(DateTimeKind = DateTimeKind.Utc, DateTimeByteFormat = DateTimeByteFormat.UnixTimeStamp64Bit)]
+		public DateTime DateTime64Field;
+
+		[ProtocolField(StartPos = 12)] public Guid GuidField;
+		[ProtocolField(StartPos = 28)] public decimal DecimalField;
 	}
 
 
