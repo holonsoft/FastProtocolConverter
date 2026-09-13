@@ -75,6 +75,12 @@ namespace holonsoft.FastProtocolConverter.dto
 		public Action<T, object> Setter { get; }
 
 		/// <summary>
+		/// Compiled accessor for reading the field value. Replaces FieldInfo.GetValue, which was
+		/// real reflection executed for every field of every message on the write path.
+		/// </summary>
+		public Func<T, object> Getter { get; }
+
+		/// <summary>
 		/// Field size, depends on type and will be calculated only for primitives, string and enum is set to -1
 		/// </summary>
 		public int ExpectedFieldSize { get; }
@@ -152,6 +158,7 @@ namespace holonsoft.FastProtocolConverter.dto
 			FieldInfo = fieldInfo;
 
 			Setter = FastInvoke.BuildUntypedSetter<T>(fieldInfo);
+			Getter = FastInvoke.BuildUntypedGetter<T>(fieldInfo);
 
 
 			Attribute = attribute;

@@ -144,7 +144,7 @@ namespace holonsoft.FastProtocolConverter
 							break;
 					}
 
-					kvp.Value.FieldInfo.SetValue(result, dataStr);
+					kvp.Value.Setter(result, dataStr);
 					actualPosition += length;
 
 					continue;
@@ -177,7 +177,7 @@ namespace holonsoft.FastProtocolConverter
 		{
 			var lengthFieldInfo = _fieldListByName[inspectedField.StrAttribute.LengthFieldName];
 
-			return (int) Convert.ToInt32(lengthFieldInfo.FieldInfo.GetValue(result));
+			return (int) Convert.ToInt32(lengthFieldInfo.Getter(result));
 		}
 
 
@@ -235,7 +235,7 @@ namespace holonsoft.FastProtocolConverter
 
 				}
 
-				kvp.Value.FieldInfo.SetValue(result, dataStr);
+				kvp.Value.Setter(result, dataStr);
 				return kvp.Value.StrAttribute.StringMaxLengthInByteArray;
 			}
 

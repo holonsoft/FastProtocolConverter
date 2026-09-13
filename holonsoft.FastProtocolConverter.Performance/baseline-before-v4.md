@@ -96,6 +96,33 @@ local to the call instead of living on the shared field info. The buffer is only
 protocol that actually contains strings and is pre sized from the declared maximum length, so a
 protocol without strings allocates exactly as much as before. Phase 3 removes it entirely.
 
+## Phase 2, step 1: compiled accessors instead of reflection
+
+`FastInvoke.BuildUntypedGetter` existed in the codebase but was never called, so the write path ran
+`FieldInfo.GetValue` for every field of every message. Wiring it up removed the last eleven live
+reflection calls in both directions.
+
+Measured as an A/B of the same tree with and without the change, back to back on the same machine,
+because comparing against a run from a different time of day is meaningless at this resolution:
+
+| Method | FieldInfo.GetValue | compiled | delta |
+|---|---:|---:|---:|
+| Read  LE      | 122.76 ns | 126.12 ns |  +2.7% |
+| Read  BE      | 152.01 ns | 150.79 ns |  -0.8% |
+| Read  reused  | 123.48 ns | 125.83 ns |  +1.9% |
+| Write LE      | 285.79 ns | 237.36 ns | **-16.9%** |
+| Write BE      | 414.45 ns | 364.97 ns | **-11.9%** |
+| Read  string  |  89.59 ns |  73.20 ns | **-18.3%** |
+| Write string  | 191.11 ns | 180.51 ns |  -5.5% |
+
+The first three rows are the control: nothing on the read path of a string free POCO was touched, and
+they move by at most 2.7%, which is the noise floor of this machine. Every row that was touched moved
+far outside its error bar.
+
+Allocation is unchanged everywhere. `BuildUntypedGetter` returns `Func<T, object>`, so a value type
+field still boxes on the way out exactly as `GetValue` did. Removing that box needs the typed
+accessors, which is the next step.
+
 ## Targets for v4
 
 1. Replace `FieldInfo.GetValue` with the compiled getter that already exists unused in `FastInvoke`.
