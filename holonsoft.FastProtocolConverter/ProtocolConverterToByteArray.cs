@@ -76,11 +76,11 @@ namespace holonsoft.FastProtocolConverter
 			{
 				case SupportedEncoder.None:
 				case SupportedEncoder.Default:
-					stringBuffer.AddRange(Encoding.ASCII.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
+					stringBuffer.AddRange(Encoding.ASCII.GetBytes((string) kvp.Value.Getter(data)));
 					fillupChar = Encoding.ASCII.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
 					break;
 				case SupportedEncoder.UnicodeEncoder:
-					stringBuffer.AddRange(Encoding.Unicode.GetBytes((string) kvp.Value.FieldInfo.GetValue(data)));
+					stringBuffer.AddRange(Encoding.Unicode.GetBytes((string) kvp.Value.Getter(data)));
 					fillupChar = Encoding.Unicode.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
 					break;
 			}
@@ -111,31 +111,31 @@ namespace holonsoft.FastProtocolConverter
 
 			if (correspondingLengthField.FieldInfo.FieldType == typeof(int))
 			{
-				correspondingLengthField.FieldInfo.SetValue(data, effectiveLength);
+				correspondingLengthField.Setter(data, effectiveLength);
 				return;
 			}
 
 			if (correspondingLengthField.FieldInfo.FieldType == typeof(uint))
 			{
-				correspondingLengthField.FieldInfo.SetValue(data, (uint) effectiveLength);
+				correspondingLengthField.Setter(data, (uint) effectiveLength);
 				return;
 			}
 
 			if (correspondingLengthField.FieldInfo.FieldType == typeof(short))
 			{
-				correspondingLengthField.FieldInfo.SetValue(data, (short) effectiveLength);
+				correspondingLengthField.Setter(data, (short) effectiveLength);
 				return;
 			}
 
 			if (correspondingLengthField.FieldInfo.FieldType == typeof(ushort))
 			{
-				correspondingLengthField.FieldInfo.SetValue(data, (ushort) effectiveLength);
+				correspondingLengthField.Setter(data, (ushort) effectiveLength);
 				return;
 			}
 
 			if (correspondingLengthField.FieldInfo.FieldType == typeof(byte))
 			{
-				correspondingLengthField.FieldInfo.SetValue(data, (byte) effectiveLength);
+				correspondingLengthField.Setter(data, (byte) effectiveLength);
 				return;
 			}
 
@@ -177,9 +177,9 @@ namespace holonsoft.FastProtocolConverter
 		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
 		{
 			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
-			var field = kvp.Value.FieldInfo;
 
-			var fieldValue = field.GetValue(data);
+			// compiled accessor, this used to be FieldInfo.GetValue per field per message
+			var fieldValue = kvp.Value.Getter(data);
 
 			if (kvp.Value.IsEnum)
 			{
