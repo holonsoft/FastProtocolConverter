@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -159,16 +160,9 @@ namespace holonsoft.FastProtocolConverter
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private string FromByteArrayToStringConverter(byte[] data, int actualPosition, int length, Encoding encoding)
 		{
-			var strArray = new byte[length];
-
-			// see https://gist.github.com/fraguada/301fe31b939e6889514969cb1bbec37c
-			//Array.Copy: 360ms
-			//Linq: 31335ms
-			//Buffer.BlockCopy: 84ms
-			//ArraySegment: 600m
-			Buffer.BlockCopy(data, actualPosition, strArray, 0, length);
-
-			return encoding.GetString(strArray);
+			// decoded straight out of the source array, the copy into a temporary byte[] was
+			// allocated for every string of every message
+			return encoding.GetString(data.AsSpan(actualPosition, length));
 		}
 
 
@@ -399,20 +393,9 @@ namespace holonsoft.FastProtocolConverter
 		{
 			double doubleVal;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[8]
-				{
-					data[pos + 7], data[pos + 6], data[pos + 5], data[pos + 4], data[pos + 3], data[pos + 2], data[pos + 1],
-					data[pos + 0],
-				};
-
-				doubleVal = BitConverter.ToDouble(buffer, 0);
-			}
-			else
-			{
-				doubleVal = BitConverter.ToDouble(data, pos);
-			}
+			doubleVal = UseBigEndian
+				? BinaryPrimitives.ReadDoubleBigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadDoubleLittleEndian(data.AsSpan(pos));
 
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeDouble.IsInRange(doubleVal))
@@ -453,16 +436,9 @@ namespace holonsoft.FastProtocolConverter
 		{
 			float floatVal;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[4] {data[pos + 3], data[pos + 2], data[pos + 1], data[pos + 0],};
-
-				floatVal = BitConverter.ToSingle(buffer, 0);
-			}
-			else
-			{
-				floatVal = BitConverter.ToSingle(data, pos);
-			}
+			floatVal = UseBigEndian
+				? BinaryPrimitives.ReadSingleBigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadSingleLittleEndian(data.AsSpan(pos));
 
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeSingle.IsInRange(floatVal))
@@ -503,20 +479,9 @@ namespace holonsoft.FastProtocolConverter
 		{
 			ulong ulongVal;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[8]
-				{
-					data[pos + 7], data[pos + 6], data[pos + 5], data[pos + 4], data[pos + 3], data[pos + 2], data[pos + 1],
-					data[pos + 0],
-				};
-
-				ulongVal = BitConverter.ToUInt64(buffer, 0);
-			}
-			else
-			{
-				ulongVal = BitConverter.ToUInt64(data, pos);
-			}
+			ulongVal = UseBigEndian
+				? BinaryPrimitives.ReadUInt64BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(pos));
 
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeUInt64.IsInRange(ulongVal))
@@ -557,20 +522,9 @@ namespace holonsoft.FastProtocolConverter
 		{
 			long longVal;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[8]
-				{
-					data[pos + 7], data[pos + 6], data[pos + 5], data[pos + 4], data[pos + 3], data[pos + 2], data[pos + 1],
-					data[pos + 0],
-				};
-
-				longVal = BitConverter.ToInt64(buffer, 0);
-			}
-			else
-			{
-				longVal = BitConverter.ToInt64(data, pos);
-			}
+			longVal = UseBigEndian
+				? BinaryPrimitives.ReadInt64BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadInt64LittleEndian(data.AsSpan(pos));
 
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeInt64.IsInRange(longVal))
@@ -612,16 +566,9 @@ namespace holonsoft.FastProtocolConverter
 		{
 			ushort uint16Val;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[2] {data[pos + 1], data[pos + 0],};
-
-				uint16Val = BitConverter.ToUInt16(buffer, 0);
-			}
-			else
-			{
-				uint16Val = BitConverter.ToUInt16(data, pos);
-			}
+			uint16Val = UseBigEndian
+				? BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(pos));
 
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeUInt16.IsInRange(uint16Val))
@@ -663,16 +610,9 @@ namespace holonsoft.FastProtocolConverter
 		{
 			short shortVal;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[2] {data[pos + 1], data[pos + 0],};
-
-				shortVal = BitConverter.ToInt16(buffer, 0);
-			}
-			else
-			{
-				shortVal = BitConverter.ToInt16(data, pos);
-			}
+			shortVal = UseBigEndian
+				? BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadInt16LittleEndian(data.AsSpan(pos));
 
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeInt16.IsInRange(shortVal))
@@ -714,16 +654,9 @@ namespace holonsoft.FastProtocolConverter
 		{
 			uint uintVal;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[4] {data[pos + 3], data[pos + 2], data[pos + 1], data[pos + 0],};
-
-				uintVal = BitConverter.ToUInt32(buffer, 0);
-			}
-			else
-			{
-				uintVal = BitConverter.ToUInt32(data, pos);
-			}
+			uintVal = UseBigEndian
+				? BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(pos));
 
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeUInt.IsInRange(uintVal))
@@ -804,16 +737,9 @@ namespace holonsoft.FastProtocolConverter
 
 			int intVal;
 
-			if (UseBigEndian)
-			{
-				var buffer = new byte[4] {data[pos + 3], data[pos + 2], data[pos + 1], data[pos + 0],};
-
-				intVal = BitConverter.ToInt32(buffer, 0);
-			}
-			else
-			{
-				intVal = BitConverter.ToInt32(data, pos);
-			}
+			intVal = UseBigEndian
+				? BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos));
 
 			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeInt.IsInRange(intVal))
 			{
@@ -851,10 +777,14 @@ namespace holonsoft.FastProtocolConverter
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private int SetFieldHandleGuidValues(T result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, byte[] data, int pos)
 		{
-			var buffer = new byte[16];
-			Array.Copy(data, pos, buffer, 0, 16);
+			// stack buffer, this used to allocate a byte[16] and, for big endian, a LINQ reverse
+			// plus another array on top of it for every Guid of every message
+			Span<byte> buffer = stackalloc byte[16];
+			data.AsSpan(pos, 16).CopyTo(buffer);
 
-			Guid value = UseBigEndian ? new Guid(buffer.Reverse().ToArray()) : new Guid(buffer);
+			if (UseBigEndian) buffer.Reverse();
+
+			var value = new Guid(buffer);
 
 			kvp.Value.Set(result, value);
 
@@ -872,19 +802,9 @@ namespace holonsoft.FastProtocolConverter
 				case DateTimeByteFormat.UnixTimeStamp32Bit:
 					long intVal;
 
-					if (UseBigEndian)
-					{
-						var buffer = new byte[4]
-						{
-							data[pos + 3], data[pos + 2], data[pos + 1], data[pos + 0],
-						};
-
-						intVal = BitConverter.ToInt32(buffer, 0);
-					}
-					else
-					{
-						intVal = BitConverter.ToInt32(data, pos);
-					}
+					intVal = UseBigEndian
+				? BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(pos));
 
 					dtValue = DateTimeExtensions.UnixEpoch.AddSeconds(intVal);
 					kvp.Value.Set(result, dtValue);
@@ -892,20 +812,9 @@ namespace holonsoft.FastProtocolConverter
 				case DateTimeByteFormat.UnixTimeStamp64Bit:
 					long longVal;
 
-					if (UseBigEndian)
-					{
-						var buffer = new byte[8]
-						{
-							data[pos + 7], data[pos + 6], data[pos + 5], data[pos + 4], data[pos + 3], data[pos + 2], data[pos + 1],
-							data[pos + 0],
-						};
-
-						longVal = BitConverter.ToInt64(buffer, 0);
-					}
-					else
-					{
-						longVal = BitConverter.ToInt64(data, pos);
-					}
+					longVal = UseBigEndian
+				? BinaryPrimitives.ReadInt64BigEndian(data.AsSpan(pos))
+				: BinaryPrimitives.ReadInt64LittleEndian(data.AsSpan(pos));
 
 					dtValue = DateTimeExtensions.UnixEpoch.AddSeconds(longVal);
 					kvp.Value.Set(result, dtValue);

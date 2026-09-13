@@ -8,6 +8,7 @@ using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
 using holonsoft.FastProtocolConverter.dto;
 using holonsoft.FluentDateTime.DateTime;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 
 namespace holonsoft.FastProtocolConverter
@@ -20,7 +21,8 @@ namespace holonsoft.FastProtocolConverter
 			IsPrepared.Requires("Prepare()").IsTrue();
 			data.Requires(nameof(data)).IsNotNull();
 
-			var result = new List<byte>();
+			// sized up front, the backing array used to double its way up from nothing
+			var result = new List<byte>(_writeSizeEstimate);
 
 			// Scratch buffer for string encoding. It is local to this call on purpose: it used to be
 			// a List<byte> on the shared ConverterFieldInfo, so two threads serialising different
@@ -64,28 +66,22 @@ namespace holonsoft.FastProtocolConverter
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private void CalculateBufferForString(T data, KeyValuePair<int, ConverterFieldInfo<T>> kvp, List<byte> stringBuffer)
 		{
-			var converterFieldInfo = kvp.Value;
-			var strAttr = converterFieldInfo.StrAttribute;
+			var field = kvp.Value;
+			var strAttr = field.StrAttribute;
 
-			stringBuffer.Clear();
+			var value = (string) field.Getter(data) ?? string.Empty;
+			var encoding = field.StringEncoding;
 
-			byte[] fillupChar = null;
+			// encoded straight into the backing array of the list. Encoding.GetBytes(string)
+			// allocated a byte[] for every string of every message.
+			var byteCount = encoding.GetByteCount(value);
 
-			// encode str to destination byte array
-			switch (strAttr.Encoder)
-			{
-				case SupportedEncoder.None:
-				case SupportedEncoder.Default:
-					stringBuffer.AddRange(Encoding.ASCII.GetBytes((string) kvp.Value.Getter(data)));
-					fillupChar = Encoding.ASCII.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
-					break;
-				case SupportedEncoder.UnicodeEncoder:
-					stringBuffer.AddRange(Encoding.Unicode.GetBytes((string) kvp.Value.Getter(data)));
-					fillupChar = Encoding.Unicode.GetBytes(kvp.Value.StrAttribute.FillupCharWhenShorter.ToString());
-					break;
-			}
+			CollectionsMarshal.SetCount(stringBuffer, byteCount);
+			encoding.GetBytes(value, CollectionsMarshal.AsSpan(stringBuffer));
 
-			int effectiveLength = stringBuffer.Count;
+			var fillupChar = field.StringFillupBytes;
+
+			int effectiveLength = byteCount;
 
 			if (strAttr.IsFixedLengthString)
 			{
@@ -174,6 +170,62 @@ namespace holonsoft.FastProtocolConverter
 		}
 
 
+		/// <summary>
+		/// Appends a value in the configured byte order without allocating. BitConverter.GetBytes
+		/// allocates a fresh byte[] per call and the LINQ Reverse for big endian allocated an
+		/// iterator on top of it, both once per field per message.
+		/// Float and double go through their IEEE754 bit patterns, which is bit exact.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static void Append16(List<byte> target, ushort value, bool bigEndian)
+		{
+			if (bigEndian)
+			{
+				target.Add((byte) (value >> 8));
+				target.Add((byte) value);
+			}
+			else
+			{
+				target.Add((byte) value);
+				target.Add((byte) (value >> 8));
+			}
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static void Append32(List<byte> target, uint value, bool bigEndian)
+		{
+			if (bigEndian)
+			{
+				target.Add((byte) (value >> 24));
+				target.Add((byte) (value >> 16));
+				target.Add((byte) (value >> 8));
+				target.Add((byte) value);
+			}
+			else
+			{
+				target.Add((byte) value);
+				target.Add((byte) (value >> 8));
+				target.Add((byte) (value >> 16));
+				target.Add((byte) (value >> 24));
+			}
+		}
+
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private static void Append64(List<byte> target, ulong value, bool bigEndian)
+		{
+			if (bigEndian)
+			{
+				for (var shift = 56; shift >= 0; shift -= 8) target.Add((byte) (value >> shift));
+			}
+			else
+			{
+				for (var shift = 0; shift <= 56; shift += 8) target.Add((byte) (value >> shift));
+			}
+		}
+
+
 		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
 		{
 			// Every branch reads the field through the strongly typed accessor, so no value type is
@@ -189,14 +241,10 @@ namespace holonsoft.FastProtocolConverter
 					case DestinationType.None:
 					case DestinationType.Default:
 					case DestinationType.Int32:
-						result.AddRange(UseBigEndian
-							? BitConverter.GetBytes(enumValue).Reverse()
-							: BitConverter.GetBytes(enumValue));
+						Append32(result, unchecked((uint) enumValue), UseBigEndian);
 						break;
 					case DestinationType.Int16:
-						result.AddRange(UseBigEndian
-							? BitConverter.GetBytes((short) enumValue).Reverse()
-							: BitConverter.GetBytes((short) enumValue));
+						Append16(result, unchecked((ushort) (short) enumValue), UseBigEndian);
 						break;
 					case DestinationType.Byte:
 						result.Add((byte) enumValue);
@@ -232,50 +280,42 @@ namespace holonsoft.FastProtocolConverter
 			{
 				case TypeCode.Int32:
 				{
-					var value = field.Get<int>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append32(result, unchecked((uint) field.Get<int>(data)), UseBigEndian);
 					return;
 				}
 				case TypeCode.UInt32:
 				{
-					var value = field.Get<uint>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append32(result, field.Get<uint>(data), UseBigEndian);
 					return;
 				}
 				case TypeCode.Int16:
 				{
-					var value = field.Get<short>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append16(result, unchecked((ushort) field.Get<short>(data)), UseBigEndian);
 					return;
 				}
 				case TypeCode.UInt16:
 				{
-					var value = field.Get<ushort>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append16(result, field.Get<ushort>(data), UseBigEndian);
 					return;
 				}
 				case TypeCode.Int64:
 				{
-					var value = field.Get<long>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append64(result, unchecked((ulong) field.Get<long>(data)), UseBigEndian);
 					return;
 				}
 				case TypeCode.UInt64:
 				{
-					var value = field.Get<ulong>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append64(result, field.Get<ulong>(data), UseBigEndian);
 					return;
 				}
 				case TypeCode.Single:
 				{
-					var value = field.Get<float>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append32(result, unchecked((uint) BitConverter.SingleToInt32Bits(field.Get<float>(data))), UseBigEndian);
 					return;
 				}
 				case TypeCode.Double:
 				{
-					var value = field.Get<double>(data);
-					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
+					Append64(result, unchecked((ulong) BitConverter.DoubleToInt64Bits(field.Get<double>(data))), UseBigEndian);
 					return;
 				}
 				case TypeCode.SByte:
@@ -309,15 +349,11 @@ namespace holonsoft.FastProtocolConverter
 
 					if (field.DateTimeAttribute.DateTimeByteFormat == DateTimeByteFormat.UnixTimeStamp32Bit)
 					{
-						result.AddRange(UseBigEndian
-							? BitConverter.GetBytes((int) uts).Reverse()
-							: BitConverter.GetBytes((int) uts));
+						Append32(result, unchecked((uint) (int) uts), UseBigEndian);
 						return;
 					}
 
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes(uts).Reverse()
-						: BitConverter.GetBytes(uts));
+					Append64(result, unchecked((ulong) uts), UseBigEndian);
 					return;
 				}
 			}
