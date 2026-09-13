@@ -76,6 +76,26 @@ first, running both suites back to back removed the second.
 Conclusion: the correctness work is not a speed up and was never meant to be. It costs a few percent
 on reading, nothing on writing, and no extra allocation. The speed up comes from the targets below.
 
+## After the thread safety fix
+
+Removing the shared mutable state also removed a string format and a string parse per enum field
+(`int.ToString()` plus `Enum.Parse(type, string)` became `Enum.ToObject(type, int)`).
+
+| Method | old | now | delta | old B | now B |
+|---|---:|---:|---:|---:|---:|
+| Read  LE      | 118.1 ns | 104.0 ns | -11.9% |  344 |  344 |
+| Read  BE      | 146.2 ns | 128.5 ns | -12.1% |  568 |  568 |
+| Read  reused  | 115.6 ns | 105.2 ns |  -9.0% |  288 |  288 |
+| Write LE      | 245.3 ns | 239.5 ns |  -2.4% |  888 |  888 |
+| Write BE      | 376.9 ns | 350.6 ns |  -7.0% | 1528 | 1528 |
+| Read  string  |  74.0 ns |  74.5 ns |  +0.8% |  288 |  288 |
+| Write string  | 166.1 ns | 164.4 ns |  -1.0% |  384 |  472 |
+
+The 88 extra bytes on the string write path are the price of correctness: the encoding buffer is now
+local to the call instead of living on the shared field info. The buffer is only allocated for a
+protocol that actually contains strings and is pre sized from the declared maximum length, so a
+protocol without strings allocates exactly as much as before. Phase 3 removes it entirely.
+
 ## Targets for v4
 
 1. Replace `FieldInfo.GetValue` with the compiled getter that already exists unused in `FastInvoke`.
