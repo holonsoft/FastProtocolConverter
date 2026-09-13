@@ -59,6 +59,10 @@ namespace holonsoft.FastProtocolConverter
 
 		private T ConvertFromByteArray(byte[] data)
 		{
+			// the order matters: before the span overloads existed an unprepared converter was
+			// reported first, and a caller passing null to an unprepared converter should keep
+			// seeing the same exception it always saw
+			ThrowIfNotPrepared();
 			ThrowIfNull(data, nameof(data));
 
 			return ConvertFromByteArray(new ReadOnlySpan<byte>(data));
@@ -67,6 +71,7 @@ namespace holonsoft.FastProtocolConverter
 
 		private void ConvertFromByteArray(byte[] data, T instance)
 		{
+			ThrowIfNotPrepared();
 			ThrowIfNull(data, nameof(data));
 
 			ConvertFromByteArray(new ReadOnlySpan<byte>(data), instance);

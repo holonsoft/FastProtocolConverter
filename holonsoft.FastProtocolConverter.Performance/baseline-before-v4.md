@@ -246,10 +246,13 @@ A/B of the same tree with and without the change, back to back:
 
 Allocation is unchanged in every row, the validator was a struct.
 
-Two guards were removed per read and per write, but they did not cost the same. The expensive one
-is `Requires<T>` on a reference type, which needs a runtime type handle and cannot be inlined out
-of the unoptimized assembly. The one on `bool` is cheap. That is why the span overload, which only
-ever ran the cheap one, barely moves while the array overload nearly halves.
+What the A/B shows is that every row improved and that reading gained far more than writing. What
+it does not show is why. Both directions removed exactly the same two guards, one on a reference
+type and one on `bool`, yet reading saved about 65 ns and writing about 18 ns. So the saving is
+not simply the cost of the two calls, and no measurement here isolates the rest of it. The likely
+remainder is an inlining cascade, an opaque call at the top of a method blocks the JIT from
+inlining what follows, and the read path had more to gain from that than the write path. That is
+a hypothesis, not a result.
 
 The reads are now faster than the write path for the first time in this library's history.
 
