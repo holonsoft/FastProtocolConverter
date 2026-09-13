@@ -6,7 +6,6 @@ using holonsoft.FluentConditions;
 using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
 using holonsoft.FastProtocolConverter.dto;
-using holonsoft.FluentDateTime.DateTime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -345,7 +344,11 @@ namespace holonsoft.FastProtocolConverter
 				{
 					var dtf = field.Get<DateTime>(data);
 					dtf = field.DateTimeAttribute.DateTimeKind == DateTimeKind.Utc ? dtf.ToUniversalTime() : dtf.ToLocalTime();
-					var uts = dtf.ToUnixTimeSeconds();
+					// this is what holonsoft.FluentDateTime's ToUnixTimeSeconds does, inlined here. That
+					// package is a non optimized build, so the JIT could neither optimize nor inline the
+					// call, and the Kind is already normalised to Utc or Local on the line above, which is
+					// what makes the DateTimeOffset conversion well defined
+					var uts = new DateTimeOffset(dtf).ToUnixTimeSeconds();
 
 					if (field.DateTimeAttribute.DateTimeByteFormat == DateTimeByteFormat.UnixTimeStamp32Bit)
 					{

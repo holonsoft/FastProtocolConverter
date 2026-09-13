@@ -8,7 +8,6 @@ using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
 using holonsoft.FastProtocolConverter.dto;
 using holonsoft.FluentConditions;
-using holonsoft.FluentDateTime.DateTime;
 using System.Linq;
 
 namespace holonsoft.FastProtocolConverter
@@ -825,7 +824,7 @@ namespace holonsoft.FastProtocolConverter
 				? BinaryPrimitives.ReadInt32BigEndian(data.Slice(pos))
 				: BinaryPrimitives.ReadInt32LittleEndian(data.Slice(pos));
 
-					dtValue = DateTimeExtensions.UnixEpoch.AddSeconds(intVal);
+					dtValue = DateTime.UnixEpoch.AddSeconds(intVal);
 					kvp.Value.Set(result, dtValue);
 					return 4;
 				case DateTimeByteFormat.UnixTimeStamp64Bit:
@@ -835,7 +834,7 @@ namespace holonsoft.FastProtocolConverter
 				? BinaryPrimitives.ReadInt64BigEndian(data.Slice(pos))
 				: BinaryPrimitives.ReadInt64LittleEndian(data.Slice(pos));
 
-					dtValue = DateTimeExtensions.UnixEpoch.AddSeconds(longVal);
+					dtValue = DateTime.UnixEpoch.AddSeconds(longVal);
 					kvp.Value.Set(result, dtValue);
 					return 8;
 				default:

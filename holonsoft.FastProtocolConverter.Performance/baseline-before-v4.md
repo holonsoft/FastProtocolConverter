@@ -271,6 +271,52 @@ The reads are now faster than the write path for the first time in this library'
 Reading a frame out of a receive buffer without copying it first is 132.05 ns -> 72.42 ns against
 what a caller had to write before, and 60.55 ns into a reused instance.
 
+## Phase 4, step 3: the DateTime path
+
+The same non optimized package problem applied to `holonsoft.FluentDateTime`, which sat in both
+conversion directions and which **no benchmark covered**: `BenchmarkPoco` has no DateTime field, so
+nothing in the suite ever ran that code. Guid and decimal were unmeasured for the same reason.
+A `BenchmarkAdvancedPoco` with two timestamps, a Guid and a decimal was added first, so the change
+could be measured instead of assumed.
+
+The two uses turned out to be very different:
+
+* reading used `DateTimeExtensions.UnixEpoch`, a `static readonly DateTime`. Reading a static field
+  costs nothing even in an unoptimized assembly, there is no call to inline.
+* writing used `dtf.ToUnixTimeSeconds()`, a real extension method, so a non inlinable call into the
+  unoptimized assembly for every DateTime field of every message.
+
+Both were replaced by their in box equivalents, `DateTime.UnixEpoch` and
+`new DateTimeOffset(dtf).ToUnixTimeSeconds()`, which is literally what the extension method did.
+The package reference is gone, so `holonsoft.FluentDateTime` no longer reaches a consumer of this
+library at all.
+
+`DateTime.UnixEpoch` is `1970-01-01T00:00:00` with `DateTimeKind.Utc`, byte for byte and kind for
+kind the same value FluentDateTime declared, so nothing about the decoded value changes.
+
+A/B of the same tree with and without the change, back to back:
+
+| Method | FluentDateTime | in box | delta |
+|---|---:|---:|---:|
+| Write DateTime/Guid/decimal LE | 66.70 ns | 60.04 ns | **-10.0%** |
+| Write DateTime/Guid/decimal BE | 65.51 ns | 61.27 ns |  -6.5% |
+| Read  DateTime/Guid/decimal LE | 58.18 ns | 59.42 ns |  +2.1% |
+| Read  DateTime/Guid/decimal BE | 58.66 ns | 58.08 ns |  -1.0% |
+
+The other **ten rows are the control**: the change cannot reach them and they all stay within 3%,
+drifting slightly upward in the second run. The two write rows moved outside their error bars and
+against that drift, the two read rows did not move, which is what the code predicts. About 3 ns
+per DateTime field written.
+
+### Why the golden vectors cannot cover this
+
+The `Kind` of a decoded DateTime is not in the bytes. A decoder that returns the right instant with
+the wrong `Kind` writes the very same frame back out, so a byte exact vector stays green while
+every consumer that hands the value to a `DateTimeOffset` silently reinterprets it as local time.
+`ProtocolDateTimeField` declares the Kind, which makes it part of the protocol contract, so
+`TestDateTimeConversion` asserts it directly, along with round trips in both widths, both byte
+orders, and a timestamp before the epoch.
+
 ## A note for the other holonsoft packages
 
 `holonsoft.FluentConditions` 3.0.1, `holonsoft.FluentDateTime` 2.1.1 and `holonsoft.Utils` 1.10.1
