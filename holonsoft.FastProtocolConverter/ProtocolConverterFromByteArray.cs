@@ -240,7 +240,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
+			var fieldTypeCode = kvp.Value.FieldTypeCode;
 
 			switch (fieldTypeCode)
 			{
@@ -263,7 +263,7 @@ namespace holonsoft.FastProtocolConverter
 					return SetFieldHandleUInt64Values(result, kvp, data, pos);
 
 				case TypeCode.Byte:
-					kvp.Value.Setter(result, data[pos]);
+					kvp.Value.Set(result, data[pos]);
 					return kvp.Value.IsPaddingByte ? kvp.Value.BytePaddingAttribute.Padding : 1;
 
 				case TypeCode.SByte:
@@ -280,7 +280,7 @@ namespace holonsoft.FastProtocolConverter
 
 				case TypeCode.Boolean:
 					//fieldInfo.SetValue(result, data[pos] == 1 ? true : false);
-					kvp.Value.Setter(result, data[pos] == 1 ? true : false);
+					kvp.Value.Set(result, data[pos] == 1);
 					return 1;
 				case TypeCode.DateTime:
 					return SetFieldHandleDateTimeValues(result, kvp, data, pos);
@@ -297,7 +297,7 @@ namespace holonsoft.FastProtocolConverter
 			// a single byte has no byte order, so UseBigEndian is irrelevant here
 			var sByteVal = unchecked((sbyte) data[pos]);
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(sByteVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeSByte.IsInRange(sByteVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -306,16 +306,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, sByteVal);
+						kvp.Value.Set(result, sByteVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeSByte.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeSByte.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeSByte.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeSByte.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeSByte.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeSByte.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -323,7 +323,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 			else
 			{
-				kvp.Value.Setter(result, sByteVal);
+				kvp.Value.Set(result, sByteVal);
 			}
 
 			return 1;
@@ -361,7 +361,7 @@ namespace holonsoft.FastProtocolConverter
 					"Invalid decimal representation in byte stream for field " + kvp.Value.FieldInfo.Name, ex);
 			}
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(decimalVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeDecimal.IsInRange(decimalVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -370,16 +370,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, decimalVal);
+						kvp.Value.Set(result, decimalVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeDecimal.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeDecimal.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeDecimal.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeDecimal.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeDecimal.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeDecimal.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -387,7 +387,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 			else
 			{
-				kvp.Value.Setter(result, decimalVal);
+				kvp.Value.Set(result, decimalVal);
 			}
 
 			return 16;
@@ -415,7 +415,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(doubleVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeDouble.IsInRange(doubleVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -424,16 +424,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, doubleVal);
+						kvp.Value.Set(result, doubleVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeDouble.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeDouble.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeDouble.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeDouble.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeDouble.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeDouble.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -441,7 +441,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 			else
 			{
-				kvp.Value.Setter(result, doubleVal);
+				kvp.Value.Set(result, doubleVal);
 			}
 
 			return 8;
@@ -465,7 +465,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(floatVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeSingle.IsInRange(floatVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -474,16 +474,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, floatVal);
+						kvp.Value.Set(result, floatVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeSingle.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeSingle.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeSingle.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeSingle.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeSingle.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeSingle.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -491,7 +491,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 			else
 			{
-				kvp.Value.Setter(result, floatVal);
+				kvp.Value.Set(result, floatVal);
 			}
 
 			return 4;
@@ -519,7 +519,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(ulongVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeUInt64.IsInRange(ulongVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -528,16 +528,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, ulongVal);
+						kvp.Value.Set(result, ulongVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt64.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt64.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt64.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt64.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt64.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt64.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -545,7 +545,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 			else
 			{
-				kvp.Value.Setter(result, ulongVal);
+				kvp.Value.Set(result, ulongVal);
 			}
 
 			return 8;
@@ -573,7 +573,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(longVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeInt64.IsInRange(longVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -582,16 +582,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, longVal);
+						kvp.Value.Set(result, longVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt64.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt64.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt64.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt64.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt64.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt64.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -600,7 +600,7 @@ namespace holonsoft.FastProtocolConverter
 			else
 			{
 				//field.SetValue(result, longVal);
-				kvp.Value.Setter(result, longVal);
+				kvp.Value.Set(result, longVal);
 			}
 
 			return 8;
@@ -624,7 +624,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(uint16Val))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeUInt16.IsInRange(uint16Val))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -633,16 +633,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, uint16Val);
+						kvp.Value.Set(result, uint16Val);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt16.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt16.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt16.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt16.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt16.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt16.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -651,7 +651,7 @@ namespace holonsoft.FastProtocolConverter
 			else
 			{
 				//field.SetValue(result, uintVal);
-				kvp.Value.Setter(result, uint16Val);
+				kvp.Value.Set(result, uint16Val);
 			}
 
 			return 2;
@@ -675,7 +675,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(shortVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeInt16.IsInRange(shortVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -684,16 +684,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, shortVal);
+						kvp.Value.Set(result, shortVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt16.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt16.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt16.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt16.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt16.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt16.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -702,7 +702,7 @@ namespace holonsoft.FastProtocolConverter
 			else
 			{
 				//field.SetValue(result, uintVal);
-				kvp.Value.Setter(result, shortVal);
+				kvp.Value.Set(result, shortVal);
 			}
 
 			return 2;
@@ -726,7 +726,7 @@ namespace holonsoft.FastProtocolConverter
 			}
 
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(uintVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeUInt.IsInRange(uintVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -735,16 +735,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, uintVal);
+						kvp.Value.Set(result, uintVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeUInt.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeUInt.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -753,7 +753,7 @@ namespace holonsoft.FastProtocolConverter
 			else
 			{
 				//field.SetValue(result, uintVal);
-				kvp.Value.Setter(result, uintVal);
+				kvp.Value.Set(result, uintVal);
 			}
 
 			return 4;
@@ -795,9 +795,9 @@ namespace holonsoft.FastProtocolConverter
 						throw new ProtocolConverterException("Conversion for enum " + kvp.Value.FieldName + " not supported");
 				}
 
-				// Enum.ToObject instead of formatting the number and parsing it back, which
-				// allocated a string for every enum field of every message
-				kvp.Value.Setter(result, Enum.ToObject(kvp.Value.FieldInfo.FieldType, rawValue));
+				// the typed accessor converts int to the enum inside the compiled expression, so
+				// neither Enum.ToObject nor a box is needed
+				kvp.Value.Set(result, rawValue);
 
 				return returnVal;
 			}
@@ -815,7 +815,7 @@ namespace holonsoft.FastProtocolConverter
 				intVal = BitConverter.ToInt32(data, pos);
 			}
 
-			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(intVal))
+			if (kvp.Value.UseRangeCheck && !kvp.Value.RangeInt.IsInRange(intVal))
 			{
 				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
 
@@ -824,16 +824,16 @@ namespace holonsoft.FastProtocolConverter
 				{
 					case ConverterRangeViolationBehaviour.None:
 					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
-						kvp.Value.Setter(result, intVal);
+						kvp.Value.Set(result, intVal);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMinValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt.MinValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt.MinValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToMaxValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt.MaxValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt.MaxValue);
 						break;
 					case ConverterRangeViolationBehaviour.SetToDefaultValue:
-						kvp.Value.Setter(result, kvp.Value.RangeInt.DefaultValue);
+						kvp.Value.Set(result, kvp.Value.RangeInt.DefaultValue);
 						break;
 					case ConverterRangeViolationBehaviour.ThrowException:
 						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
@@ -842,7 +842,7 @@ namespace holonsoft.FastProtocolConverter
 			else
 			{
 				//field.SetValue(result, intVal);
-				kvp.Value.Setter(result, intVal);
+				kvp.Value.Set(result, intVal);
 			}
 
 			return 4;
@@ -856,7 +856,7 @@ namespace holonsoft.FastProtocolConverter
 
 			Guid value = UseBigEndian ? new Guid(buffer.Reverse().ToArray()) : new Guid(buffer);
 
-			kvp.Value.Setter(result, value);
+			kvp.Value.Set(result, value);
 
 			return 16;
 		}
@@ -887,7 +887,7 @@ namespace holonsoft.FastProtocolConverter
 					}
 
 					dtValue = DateTimeExtensions.UnixEpoch.AddSeconds(intVal);
-					kvp.Value.Setter(result, dtValue);
+					kvp.Value.Set(result, dtValue);
 					return 4;
 				case DateTimeByteFormat.UnixTimeStamp64Bit:
 					long longVal;
@@ -908,7 +908,7 @@ namespace holonsoft.FastProtocolConverter
 					}
 
 					dtValue = DateTimeExtensions.UnixEpoch.AddSeconds(longVal);
-					kvp.Value.Setter(result, dtValue);
+					kvp.Value.Set(result, dtValue);
 					return 8;
 				default:
 					throw new ArgumentOutOfRangeException();

@@ -1,4 +1,4 @@
-# Performance baseline before the v4 work
+﻿# Performance baseline before the v4 work
 
 Measured at commit `bcea658`, the state of the library before the v4 renovation started.
 
@@ -122,6 +122,39 @@ far outside its error bar.
 Allocation is unchanged everywhere. `BuildUntypedGetter` returns `Func<T, object>`, so a value type
 field still boxes on the way out exactly as `GetValue` did. Removing that box needs the typed
 accessors, which is the next step.
+
+## Phase 2, step 2 and 3: cached TypeCode and typed accessors
+
+Cached TypeCode (A/B, same tree with and without):
+
+  Read LE -7.0%, Read BE -6.0%, Read reused -5.7%, Write LE -12.5%,
+  Write BE -3.6%, Read string -5.0%, Write string -4.1%
+
+Typed accessors, which remove the box on every value type in both directions:
+
+| Method | boxing | typed | time | alloc |
+|---|---:|---:|---:|---|
+| Read  LE      | 118.86 ns |  94.78 ns | -20.3% | 344 -> 104 B |
+| Read  BE      | 148.85 ns | 115.31 ns | -22.5% | 568 -> 328 B |
+| Read  reused  | 114.23 ns |  90.71 ns | -20.6% | 288 ->  48 B |
+| Write LE      | 209.75 ns | 204.25 ns |  -2.6% | 888 -> 648 B |
+| Write BE      | 333.25 ns | 336.31 ns |  +0.9% | 1528 -> 1288 B |
+| Read  string  |  71.39 ns |  73.42 ns |  +2.8% | 288 -> 264 B |
+| Write string  | 182.10 ns | 155.78 ns | -14.5% | 472 -> 448 B |
+
+Reading into a reused instance allocates 48 bytes instead of 288.
+
+The write path barely moves in time because it is no longer dominated by the box: what is left is
+BitConverter.GetBytes allocating a byte[] per field, LINQ Reverse for big endian, and the growing
+List<byte>. That is exactly what Phase 3 removes.
+
+## Cumulative against the shipped 3.6.1 code (bcea658)
+
+| Method | before | now | time | alloc |
+|---|---:|---:|---:|---|
+| Read  LE      | 118.09 ns |  94.78 ns | -19.7% | 344 -> 104 B |
+| Read  reused  | 115.58 ns |  90.71 ns | -21.5% | 288 ->  48 B |
+| Write LE      | 245.33 ns | 204.25 ns | -16.7% | 888 -> 648 B |
 
 ## Targets for v4
 

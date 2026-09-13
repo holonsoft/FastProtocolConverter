@@ -28,6 +28,48 @@ namespace holonsoft.FastProtocolConverter
         }
 
 
+        /// <summary>
+        /// Strongly typed setter for a field. In contrast to <see cref="BuildUntypedSetter{T}"/> the
+        /// value never has to be boxed, which matters because this runs for every field of every
+        /// message. TField may be the primitive the protocol carries while the field itself is an
+        /// enum over that primitive, the conversion is then part of the compiled expression.
+        /// </summary>
+        public static Action<T, TField> BuildTypedFieldSetter<T, TField>(FieldInfo fieldInfo)
+        {
+            var instance = Expression.Parameter(typeof(T), "t");
+            var value = Expression.Parameter(typeof(TField), "v");
+
+            Expression assigned = value;
+
+            if (fieldInfo.FieldType != typeof(TField))
+            {
+                assigned = Expression.Convert(value, fieldInfo.FieldType);
+            }
+
+            var body = Expression.Assign(Expression.Field(instance, fieldInfo), assigned);
+
+            return Expression.Lambda<Action<T, TField>>(body, instance, value).Compile();
+        }
+
+
+        /// <summary>
+        /// Strongly typed getter for a field, the counterpart of <see cref="BuildTypedFieldSetter{T,TField}"/>.
+        /// </summary>
+        public static Func<T, TField> BuildTypedFieldGetter<T, TField>(FieldInfo fieldInfo)
+        {
+            var instance = Expression.Parameter(typeof(T), "t");
+
+            Expression body = Expression.Field(instance, fieldInfo);
+
+            if (fieldInfo.FieldType != typeof(TField))
+            {
+                body = Expression.Convert(body, typeof(TField));
+            }
+
+            return Expression.Lambda<Func<T, TField>>(body, instance).Compile();
+        }
+
+
         public static Func<T, object> BuildUntypedGetter<T>(MemberInfo memberInfo)
         {
             var targetType = memberInfo.DeclaringType;

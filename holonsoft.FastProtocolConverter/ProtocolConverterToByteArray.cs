@@ -176,37 +176,37 @@ namespace holonsoft.FastProtocolConverter
 
 		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
 		{
-			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
+			// Every branch reads the field through the strongly typed accessor, so no value type is
+			// boxed on the way out. It used to be one Getter call returning object up front.
+			var field = kvp.Value;
 
-			// compiled accessor, this used to be FieldInfo.GetValue per field per message
-			var fieldValue = kvp.Value.Getter(data);
-
-			if (kvp.Value.IsEnum)
+			if (field.IsEnum)
 			{
-				switch (kvp.Value.Attribute.TypeInByteArray)
+				var enumValue = field.Get<int>(data);
+
+				switch (field.Attribute.TypeInByteArray)
 				{
 					case DestinationType.None:
 					case DestinationType.Default:
 					case DestinationType.Int32:
 						result.AddRange(UseBigEndian
-							? BitConverter.GetBytes((int) fieldValue).Reverse()
-							: BitConverter.GetBytes((int) fieldValue));
+							? BitConverter.GetBytes(enumValue).Reverse()
+							: BitConverter.GetBytes(enumValue));
 						break;
 					case DestinationType.Int16:
-
 						result.AddRange(UseBigEndian
-							? BitConverter.GetBytes((short) (int) fieldValue).Reverse()
-							: BitConverter.GetBytes((short) (int) fieldValue));
+							? BitConverter.GetBytes((short) enumValue).Reverse()
+							: BitConverter.GetBytes((short) enumValue));
 						break;
 					case DestinationType.Byte:
-						result.Add((byte) (int) fieldValue);
+						result.Add((byte) enumValue);
 						break;
 				}
 
 				return;
 			}
 
-			if (kvp.Value.IsBitValue)
+			if (field.IsBitValue)
 			{
 				byte consolidatedBits = 0;
 				OnConsolidateBitValues?.Invoke(data, out consolidatedBits);
@@ -215,9 +215,9 @@ namespace holonsoft.FastProtocolConverter
 				return;
 			}
 
-			if (kvp.Value.IsGuid)
+			if (field.IsGuid)
 			{
-				var subArray = ((Guid) fieldValue).ToByteArray();
+				var subArray = field.Get<Guid>(data).ToByteArray();
 
 				// the reader reverses all 16 bytes when big endian is set, so the writer has to do
 				// the same, otherwise a Guid cannot be read back by this very converter.
@@ -228,97 +228,101 @@ namespace holonsoft.FastProtocolConverter
 				return;
 			}
 
-			switch (fieldTypeCode)
+			switch (field.FieldTypeCode)
 			{
 				case TypeCode.Int32:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((int) fieldValue).Reverse()
-						: BitConverter.GetBytes((int) fieldValue));
+				{
+					var value = field.Get<int>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.UInt32:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((uint) fieldValue).Reverse()
-						: BitConverter.GetBytes((uint) fieldValue));
+				{
+					var value = field.Get<uint>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.Int16:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((short) fieldValue).Reverse()
-						: BitConverter.GetBytes((short) fieldValue));
+				{
+					var value = field.Get<short>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.UInt16:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((ushort) fieldValue).Reverse()
-						: BitConverter.GetBytes((ushort) fieldValue));
+				{
+					var value = field.Get<ushort>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.Int64:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((long) fieldValue).Reverse()
-						: BitConverter.GetBytes((long) fieldValue));
+				{
+					var value = field.Get<long>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.UInt64:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((ulong) fieldValue).Reverse()
-						: BitConverter.GetBytes((ulong) fieldValue));
+				{
+					var value = field.Get<ulong>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.Single:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((float) fieldValue).Reverse()
-						: BitConverter.GetBytes((float) fieldValue));
+				{
+					var value = field.Get<float>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.Double:
-					result.AddRange(UseBigEndian
-						? BitConverter.GetBytes((double) fieldValue).Reverse()
-						: BitConverter.GetBytes((double) fieldValue));
+				{
+					var value = field.Get<double>(data);
+					result.AddRange(UseBigEndian ? BitConverter.GetBytes(value).Reverse() : BitConverter.GetBytes(value));
 					return;
+				}
 				case TypeCode.SByte:
 					// a single byte has no byte order, so UseBigEndian is irrelevant here
-					result.Add(unchecked((byte) (sbyte) fieldValue));
+					result.Add(unchecked((byte) field.Get<sbyte>(data)));
 					return;
 				case TypeCode.Decimal:
-					WriteDecimalToArray(result, (decimal) fieldValue);
+					WriteDecimalToArray(result, field.Get<decimal>(data));
 					return;
 				case TypeCode.Byte:
-					var xByte = Convert.ToByte(fieldValue);
+				{
+					var xByte = field.Get<byte>(data);
 
-					if (kvp.Value.IsPaddingByte)
-					{
-						for (var i = 0; i < kvp.Value.BytePaddingAttribute.Padding; i++)
-						{
-							result.Add(xByte);
-						}
-					}
-					else
+					var repeat = field.IsPaddingByte ? field.BytePaddingAttribute.Padding : 1;
+
+					for (var i = 0; i < repeat; i++)
 					{
 						result.Add(xByte);
 					}
-					
+
 					return;
+				}
 				case TypeCode.Boolean:
-					var xBool = Convert.ToByte(fieldValue);
-					result.Add(xBool);
+					result.Add(field.Get<bool>(data) ? (byte) 1 : (byte) 0);
 					return;
 				case TypeCode.DateTime:
-					var dtf = (DateTime) fieldValue;
-					dtf = kvp.Value.DateTimeAttribute.DateTimeKind == DateTimeKind.Utc ? dtf.ToUniversalTime() : dtf.ToLocalTime();
+				{
+					var dtf = field.Get<DateTime>(data);
+					dtf = field.DateTimeAttribute.DateTimeKind == DateTimeKind.Utc ? dtf.ToUniversalTime() : dtf.ToLocalTime();
 					var uts = dtf.ToUnixTimeSeconds();
 
-					if (kvp.Value.DateTimeAttribute.DateTimeByteFormat == DateTimeByteFormat.UnixTimeStamp32Bit)
+					if (field.DateTimeAttribute.DateTimeByteFormat == DateTimeByteFormat.UnixTimeStamp32Bit)
 					{
 						result.AddRange(UseBigEndian
 							? BitConverter.GetBytes((int) uts).Reverse()
 							: BitConverter.GetBytes((int) uts));
 						return;
 					}
-					else
-					{
-						result.AddRange(UseBigEndian
-							? BitConverter.GetBytes(uts).Reverse()
-							: BitConverter.GetBytes(uts));
-					}
-					break;
+
+					result.AddRange(UseBigEndian
+						? BitConverter.GetBytes(uts).Reverse()
+						: BitConverter.GetBytes(uts));
+					return;
+				}
 			}
 
-			if (kvp.Value.IsString)
+			if (field.IsString)
 			{
 				CalculateBufferForString(data, kvp, stringBuffer);
 
@@ -326,7 +330,7 @@ namespace holonsoft.FastProtocolConverter
 				return;
 			}
 
-			throw new ProtocolConverterException("WriteFieldValueToArray has no converter for " + kvp.Value.FieldName);
+			throw new ProtocolConverterException("WriteFieldValueToArray has no converter for " + field.FieldName);
 		}
 	}
 }

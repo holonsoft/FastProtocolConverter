@@ -81,6 +81,63 @@ namespace holonsoft.FastProtocolConverter.dto
 		public Func<T, object> Getter { get; }
 
 		/// <summary>
+		/// Strongly typed accessors for the field, so a value type never has to be boxed on the way
+		/// in or out. The concrete delegate type is Action&lt;T, X&gt; resp. Func&lt;T, X&gt; where X
+		/// is the field type, or the primitive the protocol carries for an enum field. The per type
+		/// handlers know X and cast, which costs a type check instead of an allocation.
+		/// Null for types without a typed path, for example string, where nothing is boxed anyway.
+		/// </summary>
+		public Delegate TypedSetter { get; }
+
+		/// <inheritdoc cref="TypedSetter"/>
+		public Delegate TypedGetter { get; }
+
+
+		/// <summary>
+		/// Assigns the field without boxing. TField must match the type the accessor was built for,
+		/// which the per type handlers know.
+		/// </summary>
+		public void Set<TField>(T target, TField value)
+			=> ((Action<T, TField>) TypedSetter)(target, value);
+
+
+		/// <summary>
+		/// Reads the field without boxing, counterpart of <see cref="Set{TField}"/>.
+		/// </summary>
+		public TField Get<TField>(T source)
+			=> ((Func<T, TField>) TypedGetter)(source);
+
+
+		/// <summary>
+		/// Builds the typed pair for the field. For an enum the protocol carries a primitive, so the
+		/// accessor is typed on that primitive and the compiled expression converts.
+		/// </summary>
+		private void BuildTypedAccessors(FieldInfo fieldInfo, out Delegate setter, out Delegate getter)
+		{
+			// An enum is always carried as int here: the read path assembles the raw value as an int
+			// for every DestinationType it supports, and the compiled expression converts to the enum.
+			var accessAs = IsEnum ? typeof(int) : fieldInfo.FieldType;
+
+			if (IsString || accessAs == typeof(string))
+			{
+				setter = null;
+				getter = null;
+				return;
+			}
+
+			var setterBuilder = typeof(FastInvoke)
+				.GetMethod(nameof(FastInvoke.BuildTypedFieldSetter))
+				.MakeGenericMethod(typeof(T), accessAs);
+
+			var getterBuilder = typeof(FastInvoke)
+				.GetMethod(nameof(FastInvoke.BuildTypedFieldGetter))
+				.MakeGenericMethod(typeof(T), accessAs);
+
+			setter = (Delegate) setterBuilder.Invoke(null, [fieldInfo]);
+			getter = (Delegate) getterBuilder.Invoke(null, [fieldInfo]);
+		}
+
+		/// <summary>
 		/// Field size, depends on type and will be calculated only for primitives, string and enum is set to -1
 		/// </summary>
 		public int ExpectedFieldSize { get; }
@@ -131,7 +188,11 @@ namespace holonsoft.FastProtocolConverter.dto
 		/// </summary>
 		public string FieldName => FieldInfo.Name;
 
-		private readonly TypeCode _fieldTypeCode;
+		/// <summary>
+		/// TypeCode of the underlying field, resolved once. Type.GetTypeCode used to be called for
+		/// every field of every message in both directions.
+		/// </summary>
+		public TypeCode FieldTypeCode { get; }
 
 		public bool UseRangeCheck { get; } = false;
 
@@ -156,6 +217,7 @@ namespace holonsoft.FastProtocolConverter.dto
 			rangeCulture ??= CultureInfo.InvariantCulture;
 
 			FieldInfo = fieldInfo;
+			FieldTypeCode = Type.GetTypeCode(fieldInfo.FieldType);
 
 			Setter = FastInvoke.BuildUntypedSetter<T>(fieldInfo);
 			Getter = FastInvoke.BuildUntypedGetter<T>(fieldInfo);
@@ -170,6 +232,11 @@ namespace holonsoft.FastProtocolConverter.dto
 			IsByte = FieldInfo.FieldType == typeof(byte);
 
 			IsBitValue = Attribute.TypeInByteArray == DestinationType.Bits;
+
+			// needs Attribute, IsEnum and IsString, and must happen before the early return for byte
+			BuildTypedAccessors(fieldInfo, out var typedSetter, out var typedGetter);
+			TypedSetter = typedSetter;
+			TypedGetter = typedGetter;
 
 			if (IsDateTime)
 			{
@@ -276,9 +343,7 @@ namespace holonsoft.FastProtocolConverter.dto
 
 				var rawRangeAttribute = (ProtocolFieldRangeAttribute) r;
 
-				_fieldTypeCode = Type.GetTypeCode(FieldInfo.FieldType);
-
-				switch (_fieldTypeCode)
+				switch (FieldTypeCode)
 				{
 					case TypeCode.Int64:
 						RangeInt64 = new FieldRangeValue<Int64>(rawRangeAttribute, rangeCulture);
@@ -319,7 +384,7 @@ namespace holonsoft.FastProtocolConverter.dto
 
 		public bool IsInRange(object val)
 		{
-			switch (_fieldTypeCode)
+			switch (FieldTypeCode)
 			{
 				case TypeCode.Int64:
 					return RangeInt64.IsInRange((long) val);
