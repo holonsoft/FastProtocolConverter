@@ -43,13 +43,38 @@ and big endian allocates a temporary buffer per multi byte field.
 At 100.000 messages per second the write path alone produces roughly 89 MB/s of garbage in
 little endian and 153 MB/s in big endian, before any application code runs.
 
-## Effect of the v4 bug fixes
+## Effect of the v4 correctness work
 
-The bounds checks added for the truncation fix cost one comparison per field. A re-run after the
-fixes showed **identical allocation numbers** (344, 568, 288, 888, 1528, 288, 384 bytes) and timings
-between 5 and 16 ns higher. With `--job short` the reported error was up to 110 ns on a 127 ns
-measurement, so those deltas are inside the noise and no regression can be claimed or ruled out from
-that run. Repeat with `--job medium` on an idle machine when an exact figure is needed.
+Measured as an A/B against a git worktree at `bcea658`, same benchmark code on both sides,
+`--job medium`. Two rounds were run in opposite order to separate a real cost from machine drift.
+
+**Allocations are byte identical on both sides in every row.** The hardening added no garbage.
+
+Timing, round 2 (the clean one, after `EffectiveFieldSize` was cached):
+
+| Method | old | new | delta |
+|---|---:|---:|---:|
+| Read  LE      | 118.09 ns | 125.74 ns | +6.5% |
+| Read  BE      | 146.21 ns | 146.90 ns | +0.5% |
+| Read  reused  | 115.58 ns | 121.92 ns | +5.5% |
+| Write LE      | 245.33 ns | 247.98 ns | +1.1% |
+| Write BE      | 376.86 ns | 371.78 ns | -1.3% |
+| Read  string  |  73.96 ns |  76.98 ns | +4.1% |
+| Write string  | 166.05 ns | 171.43 ns | +3.2% |
+
+The **write path is the control**: the correctness work did not touch it for these POCOs, and it
+measures at +1.1% and -1.3%, which is zero within the run to run spread of this machine (about 5%
+between two runs of the same binary). That the control lands on zero is what makes the read side
+credible: the read path costs roughly **4 to 6 percent**, which is the per field bounds check that
+turns a truncated frame into a ProtocolConverterException instead of a raw BCL exception.
+
+Round 1 showed much larger deltas (+10 to +28%). Two causes: `EffectiveFieldSize` was still a
+computed property re evaluated per field per message, and the round suffered drift (the write
+control read +11% there, and two rows flipped sign between rounds). Caching the size removed the
+first, running both suites back to back removed the second.
+
+Conclusion: the correctness work is not a speed up and was never meant to be. It costs a few percent
+on reading, nothing on writing, and no extra allocation. The speed up comes from the targets below.
 
 ## Targets for v4
 
