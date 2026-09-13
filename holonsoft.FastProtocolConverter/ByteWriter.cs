@@ -75,6 +75,28 @@ namespace holonsoft.FastProtocolConverter
 
 
 		/// <summary>
+		/// Reserves <paramref name="length"/> bytes and hands them out to be filled directly, so an
+		/// encoder can write into the destination instead of into a temporary of its own.
+		///
+		/// The returned span is **empty** when the destination has no room left, which is not the same
+		/// length as what was asked for, so a caller has to compare before it writes.
+		/// </summary>
+		public Span<byte> GetSpanAndAdvance(int length)
+		{
+			if (_position + length > _buffer.Length)
+			{
+				Overflow();
+				return Span<byte>.Empty;
+			}
+
+			var slice = _buffer.Slice(_position, length);
+			_position += length;
+
+			return slice;
+		}
+
+
+		/// <summary>
 		/// Dropping the buffer is what makes every later write a no operation too, without costing the
 		/// hot path a second branch: the bounds check above already fails for an empty span.
 		/// </summary>

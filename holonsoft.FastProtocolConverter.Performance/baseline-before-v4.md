@@ -377,6 +377,51 @@ to 64 bytes as well.
 **Reading into a reused instance and writing into a reused buffer now allocate nothing at all.**
 That is the shape a signal processing loop wants: no garbage per message, at any rate.
 
+## Phase 4, step 5: encoding a string into the frame itself
+
+The last per message allocation. A string field was encoded into a `List<byte>` scratch buffer and
+the buffer was then copied into the frame, and for a sequence protocol the pre pass that assigns the
+length fields encoded every string a second time only to throw the result away.
+
+The encoder now writes into the span the frame itself occupies, and the pre pass only measures. One
+case still needs a buffer of its own: a value that is longer than its fixed length field has to be
+cut at the byte level, and an encoder cannot write into a span that is too small for its output. It
+is rented from the pool, and only values that overflow their field ever reach it.
+
+A/B of the same tree with and without the change, back to back:
+
+| Method | List scratch | into the frame | time | alloc |
+|---|---:|---:|---:|---|
+| Write string | 114.74 ns | **44.08 ns** | **-61.6%** | 152 -> 64 B |
+| Read  string |  30.48 ns |  28.12 ns |  -7.7% | 160 B, unchanged |
+
+The other **twelve rows are the control**: the change cannot reach a protocol without strings, and
+all of them stay within the run to run spread with byte identical allocation.
+
+The 160 bytes on the string read are the POCO and the decoded string itself, which is what the
+caller asked for, so there is nothing left to remove there.
+
+## Where v4 ends up
+
+Against the shipped 3.6.1 code (`bcea658`), same benchmark code on both sides:
+
+| Method | 3.6.1 | 4.0 | time | alloc |
+|---|---:|---:|---:|---|
+| Read  LE      | 118.09 ns |  58.65 ns | **-50%** |  344 ->  56 B |
+| Read  BE      | 146.21 ns |  58.19 ns | **-60%** |  568 ->  56 B |
+| Read  reused  | 115.58 ns |  28.92 ns | **-75%** |  288 -> **0 B** |
+| Write LE      | 245.33 ns |  55.76 ns | **-77%** |  888 ->  64 B |
+| Write BE      | 376.86 ns |  56.06 ns | **-85%** | 1528 -> **64 B** |
+| Read  string  |  73.96 ns |  28.12 ns | **-62%** |  288 -> 160 B |
+| Write string  | 166.05 ns |  44.08 ns | **-74%** |  384 ->  64 B |
+
+Byte order is free in both directions. Reading into a reused instance and writing into a caller
+supplied buffer allocate **nothing per message**, and reading a frame out of a receive buffer
+without copying it first costs 29.69 ns.
+
+At 100.000 messages per second the write path used to produce about 89 MB/s of garbage in little
+endian and 153 MB/s in big endian. It now produces 6.4 MB/s, or none at all into a reused buffer.
+
 ## A note for the other holonsoft packages
 
 `holonsoft.FluentConditions` 3.0.1, `holonsoft.FluentDateTime` 2.1.1 and `holonsoft.Utils` 1.10.1

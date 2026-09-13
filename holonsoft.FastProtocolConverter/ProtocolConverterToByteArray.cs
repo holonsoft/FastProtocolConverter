@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,7 +8,6 @@ using holonsoft.FastProtocolConverter.Abstractions.Enums;
 using holonsoft.FastProtocolConverter.Abstractions.Exceptions;
 using holonsoft.FastProtocolConverter.dto;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 
 namespace holonsoft.FastProtocolConverter
@@ -115,122 +115,175 @@ namespace holonsoft.FastProtocolConverter
 
 		private void WriteAllFields(ref ByteWriter writer, T data)
 		{
-			// Scratch buffer for string encoding. It is local to this call on purpose: it used to be
-			// a List<byte> on the shared ConverterFieldInfo, so two threads serialising different
-			// values through one prepared converter produced mixed up or truncated output.
-			// A protocol without strings allocates nothing here.
-			var stringBuffer = _hasStringFields ? new List<byte>(_stringBufferCapacity) : null;
-
-			if (_fieldListSeqPos.Count == 0)
+			if (_seqPosFields.Length == 0)
 			{
 				foreach (var kvp in _fixPosFields)
 				{
-					WriteFieldValueToArray(ref writer, kvp, data, stringBuffer);
+					WriteFieldValueToArray(ref writer, kvp, data);
 				}
 
 				return;
 			}
 
-			CalculateStringForWriting(data, stringBuffer);
+			// the length of a variable string travels in a field of its own, which comes earlier in
+			// the sequence than the string, so every one of them has to be known before the first
+			// byte is written
+			SetLengthFieldsForStrings(data);
 
 			foreach (var kvp in _seqPosFields)
 			{
-				WriteFieldValueToArray(ref writer, kvp, data, stringBuffer);
+				WriteFieldValueToArray(ref writer, kvp, data);
 			}
 		}
 
 
-		private void CalculateStringForWriting(T data, List<byte> stringBuffer)
+		private void SetLengthFieldsForStrings(T data)
 		{
-			// calc length fields for strings
 			foreach (var kvp in _seqPosFields)
 			{
-				if (!kvp.Value.IsString) continue;
+				var field = kvp.Value;
 
-				CalculateBufferForString(data, kvp, stringBuffer);
+				if (!field.IsString || field.StrAttribute.IsFixedLengthString) continue;
+
+				var value = (string) field.Getter(data) ?? string.Empty;
+
+				// measured, not encoded. This pre pass used to encode every string into a scratch
+				// buffer only to throw it away and encode it again while writing
+				SetLengthField(data, field, field.StringEncoding.GetByteCount(value));
 			}
 		}
 
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private void CalculateBufferForString(T data, KeyValuePair<int, ConverterFieldInfo<T>> kvp, List<byte> stringBuffer)
+		/// <summary>
+		/// Writes a string field straight into the destination. There is no scratch buffer: the
+		/// encoder writes into the span the frame itself occupies.
+		///
+		/// A fixed length field always occupies exactly its declared length. A shorter value is padded
+		/// with the fill character, cutting the last one if it does not divide the remaining room, and
+		/// a longer one is cut at the byte level, which is what this wire format has always done and
+		/// which can therefore split a surrogate pair.
+		/// </summary>
+		private void WriteStringField(ref ByteWriter writer, T data, ConverterFieldInfo<T> field)
 		{
-			var field = kvp.Value;
 			var strAttr = field.StrAttribute;
-
-			var value = (string) field.Getter(data) ?? string.Empty;
 			var encoding = field.StringEncoding;
 
-			// encoded straight into the backing array of the list. Encoding.GetBytes(string)
-			// allocated a byte[] for every string of every message.
+			var value = (string) field.Getter(data) ?? string.Empty;
 			var byteCount = encoding.GetByteCount(value);
 
-			CollectionsMarshal.SetCount(stringBuffer, byteCount);
-			encoding.GetBytes(value, CollectionsMarshal.AsSpan(stringBuffer));
-
-			var fillupChar = field.StringFillupBytes;
-
-			int effectiveLength = byteCount;
-
-			if (strAttr.IsFixedLengthString)
+			if (!strAttr.IsFixedLengthString)
 			{
-				var declaredLength = strAttr.StringMaxLengthInByteArray;
+				// a fixed position protocol never runs the pre pass, so the length field is assigned
+				// here as well. Assigning it twice for a sequence protocol is harmless, it is the
+				// same number
+				SetLengthField(data, field, byteCount);
 
-				while (effectiveLength < declaredLength)
-				{
-					stringBuffer.AddRange(fillupChar);
-					effectiveLength += fillupChar.Length;
-				}
+				var variableTarget = writer.GetSpanAndAdvance(byteCount);
 
-				// One truncation for both branches, and it is not only for values that are too long.
-				// The fill character can be wider than one byte, for example any character under the
-				// unicode encoder, and then the padding loop above overshoots whenever the declared
-				// length is not a multiple of that width. That used to grow the frame by a byte and
-				// shift every field behind the string, silently, because the buffer it was written
-				// into could grow. A fixed length field is exactly its declared length, always.
-				if (stringBuffer.Count > declaredLength)
-				{
-					stringBuffer.RemoveRange(declaredLength, stringBuffer.Count - declaredLength);
-				}
+				if (variableTarget.Length == byteCount) encoding.GetBytes(value, variableTarget);
 
 				return;
 			}
 
-			var correspondingLengthField = _fieldListByName[strAttr.LengthFieldName];
+			var declaredLength = strAttr.StringMaxLengthInByteArray;
 
-			if (correspondingLengthField.FieldInfo.FieldType == typeof(int))
+			var target = writer.GetSpanAndAdvance(declaredLength);
+
+			if (target.Length != declaredLength) return;
+
+			if (byteCount <= declaredLength)
 			{
-				correspondingLengthField.Setter(data, effectiveLength);
+				encoding.GetBytes(value, target);
+
+				PadWithFillCharacter(target.Slice(byteCount), field.StringFillupBytes);
 				return;
 			}
 
-			if (correspondingLengthField.FieldInfo.FieldType == typeof(uint))
-			{
-				correspondingLengthField.Setter(data, (uint) effectiveLength);
-				return;
-			}
+			// The value does not fit and has to be cut at the byte level, which the encoder cannot do
+			// into a span that is too small for it, so this is the one case that still needs a buffer
+			// of its own. It is rented rather than allocated, and only values that overflow their
+			// field ever reach it.
+			var scratch = ArrayPool<byte>.Shared.Rent(byteCount);
 
-			if (correspondingLengthField.FieldInfo.FieldType == typeof(short))
+			try
 			{
-				correspondingLengthField.Setter(data, (short) effectiveLength);
-				return;
-			}
+				encoding.GetBytes(value, scratch);
 
-			if (correspondingLengthField.FieldInfo.FieldType == typeof(ushort))
+				scratch.AsSpan(0, declaredLength).CopyTo(target);
+			}
+			finally
 			{
-				correspondingLengthField.Setter(data, (ushort) effectiveLength);
-				return;
+				ArrayPool<byte>.Shared.Return(scratch);
 			}
-
-			if (correspondingLengthField.FieldInfo.FieldType == typeof(byte))
-			{
-				correspondingLengthField.Setter(data, (byte) effectiveLength);
-				return;
-			}
-
-			throw new ProtocolConverterException("CalculateStringForWriting: setting length field type " +
-			                                     correspondingLengthField.FieldInfo.FieldType + " not supported yet");
 		}
+
+
+		/// <summary>
+		/// Repeats the encoded fill character over what is left of the field. The fill character can
+		/// be wider than one byte, so the last repetition is cut at the field boundary rather than
+		/// allowed to overshoot it.
+		/// </summary>
+		private static void PadWithFillCharacter(Span<byte> remainder, byte[] fillCharacter)
+		{
+			if (fillCharacter.Length == 0) return;
+
+			var position = 0;
+
+			while (position < remainder.Length)
+			{
+				var take = Math.Min(fillCharacter.Length, remainder.Length - position);
+
+				fillCharacter.AsSpan(0, take).CopyTo(remainder.Slice(position));
+
+				position += take;
+			}
+		}
+
+
+		/// <summary>
+		/// Assigns the byte length of a variable length string back onto the field the protocol names
+		/// as its length field.
+		/// </summary>
+		private void SetLengthField(T data, ConverterFieldInfo<T> field, int effectiveLength)
+		{
+			var lengthField = _fieldListByName[field.StrAttribute.LengthFieldName];
+
+			var lengthFieldType = lengthField.FieldInfo.FieldType;
+
+			if (lengthFieldType == typeof(int))
+			{
+				lengthField.Setter(data, effectiveLength);
+				return;
+			}
+
+			if (lengthFieldType == typeof(uint))
+			{
+				lengthField.Setter(data, (uint) effectiveLength);
+				return;
+			}
+
+			if (lengthFieldType == typeof(short))
+			{
+				lengthField.Setter(data, (short) effectiveLength);
+				return;
+			}
+
+			if (lengthFieldType == typeof(ushort))
+			{
+				lengthField.Setter(data, (ushort) effectiveLength);
+				return;
+			}
+
+			if (lengthFieldType == typeof(byte))
+			{
+				lengthField.Setter(data, (byte) effectiveLength);
+				return;
+			}
+
+			throw new ProtocolConverterException(
+				"Setting a string length field of type " + lengthFieldType + " is not supported yet");
+		}
+
 
 		/// <summary>
 		/// Writes a decimal as its four component integers (low, mid, high, flags) in exactly that
@@ -319,7 +372,7 @@ namespace holonsoft.FastProtocolConverter
 		}
 
 
-		private void WriteFieldValueToArray(ref ByteWriter result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data, List<byte> stringBuffer)
+		private void WriteFieldValueToArray(ref ByteWriter result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data)
 		{
 			// Every branch reads the field through the strongly typed accessor, so no value type is
 			// boxed on the way out. It used to be one Getter call returning object up front.
@@ -460,9 +513,7 @@ namespace holonsoft.FastProtocolConverter
 
 			if (field.IsString)
 			{
-				CalculateBufferForString(data, kvp, stringBuffer);
-
-				result.AddRange(CollectionsMarshal.AsSpan(stringBuffer));
+				WriteStringField(ref result, data, field);
 				return;
 			}
 
