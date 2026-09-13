@@ -1,43 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <Copyright>holonsoft</Copyright>
-    <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    <PackageProjectUrl>https://github.com/holonsoft/FastProtocolConverter</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/holonsoft/FastProtocolConverter</RepositoryUrl>
-    <Version>3.6.1</Version>
-    <Description>Reflection based fast protocol converter:
-Converts raw bytes (e. g. from a hardware device) data to an instance of a class or vice versa</Description>
-    <RepositoryType>GIT</RepositoryType>
-    <PackageTags>#net8.0#net9.0#net10.0</PackageTags>
-    <Company>holonsoft</Company>
-    <Authors>Alexander Bülow, Christian Vogt</Authors>
+    <TargetFrameworks>$(LibraryTargetFrameworks)</TargetFrameworks>
+    <Title>FastProtocolConverter by holonsoft</Title>
+    <Description>Reflection based fast protocol converter: converts raw bytes (e. g. from a hardware device) to an instance of a class or vice versa.</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="holonsoft.FluentConditions" Version="3.0.1" />
-    <PackageReference Include="holonsoft.FluentDateTime" Version="2.1.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="holonsoft.FluentConditions" />
+    <PackageReference Include="holonsoft.FluentDateTime" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\holonsoft.FastProtocolConverter.Abstractions\holonsoft.FastProtocolConverter.Abstractions.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="..\LICENSE">
-      <Pack>True</Pack>
-      <PackagePath></PackagePath>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(TargetFramework)' == 'net5.0'">
-    <PackageReference Include="holonsoft.Utils">
-      <Version>1.0.0.1</Version>
-    </PackageReference>
   </ItemGroup>
 
 </Project>

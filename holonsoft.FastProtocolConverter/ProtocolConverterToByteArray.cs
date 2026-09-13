@@ -138,6 +138,37 @@ namespace holonsoft.FastProtocolConverter
 			                                     correspondingLengthField.FieldInfo.FieldType + " not supported yet");
 		}
 
+		/// <summary>
+		/// Writes a decimal as its four component integers (low, mid, high, flags) in exactly that
+		/// order. UseBigEndian swaps the bytes inside every component, the order of the components
+		/// themselves never changes. Counterpart of SetFieldHandleDecimalValues.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void WriteDecimalToArray(List<byte> result, decimal value)
+		{
+			Span<int> bits = stackalloc int[4];
+			decimal.GetBits(value, bits);
+
+			foreach (var part in bits)
+			{
+				if (UseBigEndian)
+				{
+					result.Add((byte) (part >> 24));
+					result.Add((byte) (part >> 16));
+					result.Add((byte) (part >> 8));
+					result.Add((byte) part);
+				}
+				else
+				{
+					result.Add((byte) part);
+					result.Add((byte) (part >> 8));
+					result.Add((byte) (part >> 16));
+					result.Add((byte) (part >> 24));
+				}
+			}
+		}
+
+
 		private void WriteFieldValueToArray(List<byte> result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, T data)
 		{
 			var fieldTypeCode = Type.GetTypeCode(kvp.Value.FieldInfo.FieldType);
@@ -181,7 +212,12 @@ namespace holonsoft.FastProtocolConverter
 
 			if (kvp.Value.IsGuid)
 			{
-				var subArray = ((Guid)fieldValue).ToByteArray();
+				var subArray = ((Guid) fieldValue).ToByteArray();
+
+				// the reader reverses all 16 bytes when big endian is set, so the writer has to do
+				// the same, otherwise a Guid cannot be read back by this very converter.
+				// Note that this order is a full reversal of Guid.ToByteArray(), it is NOT RFC 4122.
+				if (UseBigEndian) Array.Reverse(subArray);
 
 				result.AddRange(subArray);
 				return;
@@ -228,6 +264,13 @@ namespace holonsoft.FastProtocolConverter
 					result.AddRange(UseBigEndian
 						? BitConverter.GetBytes((double) fieldValue).Reverse()
 						: BitConverter.GetBytes((double) fieldValue));
+					return;
+				case TypeCode.SByte:
+					// a single byte has no byte order, so UseBigEndian is irrelevant here
+					result.Add(unchecked((byte) (sbyte) fieldValue));
+					return;
+				case TypeCode.Decimal:
+					WriteDecimalToArray(result, (decimal) fieldValue);
 					return;
 				case TypeCode.Byte:
 					var xByte = Convert.ToByte(fieldValue);

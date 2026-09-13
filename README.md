@@ -10,6 +10,30 @@ Support for
 * Guid, DateTime, Boolean, Enums, strings
 * Support for endianess
 
+### Wire format of the scalar types
+
+| Type | Bytes | Notes |
+|---|---|---|
+| `byte`, `sbyte`, `bool` | 1 | a single byte has no byte order, `UseBigEndian` does not apply. `bool` is written as 0 or 1 and read as `value == 1` |
+| `short`, `ushort` | 2 | byte order follows `UseBigEndian` |
+| `int`, `uint`, `float` | 4 | byte order follows `UseBigEndian` |
+| `long`, `ulong`, `double` | 8 | byte order follows `UseBigEndian` |
+| `decimal` | 16 | the four component integers (low, mid, high, flags) in exactly that order. `UseBigEndian` swaps the bytes **inside** each component, the order of the components never changes. The scale is preserved, so `1.000` does not become `1` |
+| `Guid` | 16 | `Guid.ToByteArray()`, all 16 bytes reversed when `UseBigEndian` is set. Note that this is a full reversal and deliberately **not** RFC 4122 byte order |
+| `DateTime` | 4 or 8 | unix timestamp, see `ProtocolDateTimeFieldAttribute` |
+
+Range limits in `ProtocolFieldRangeAttribute` are written as strings and are always parsed with the
+**invariant culture**. `MinValue = "1.100"` therefore means one point one on every machine, regardless
+of the operating system locale.
+
+### Error handling when reading
+
+A byte array that is too short for the protocol is a protocol condition, not a programmer error, and
+is always reported as `ProtocolConverterException`. This holds for both protocol styles and for every
+field, so a truncated frame can never surface as a raw `ArgumentException` out of `Array.Copy` or
+`BitConverter`. The converter knows the minimum length of a protocol after `Prepare()` and checks it
+before the first field is read.
+
 It's free, opensource and licensed under <a href="https://opensource.org/licenses/Apache-2.0">APACHE 2.0</a> (an OSI approved license).
 
 You simply define a POCO and add some attributes to the fields. The following example illustrates this 
@@ -130,6 +154,17 @@ As you can see, several events are provided.
 Please note that only one field is marked as "BITS" and all other data holder fields should be marked as to be skipped: `[ProtocolField(IgnoreField = true)]`
 
 With `[ProtocolSetupArgument(OffsetInByteArray = <number_of_bytes>)]` the converter skips n bytes at the beginning. This is helpful if you do not want to assign this bytes to some fields in your POCO.
+
+> **Note:** the offset applies to reading only. `ConvertToByteArray` writes the fields of the POCO and
+> nothing else, so the output is shorter than the offset protocol by exactly those n bytes and cannot
+> be fed back into `ConvertFromByteArray` without prepending them yourself.
+>
+> This is intentional. The skipped bytes belong to a frame header that the POCO does not describe and
+> whose content only the calling application knows, so the converter must not invent them. Writing n
+> zero bytes would produce a frame that looks well formed but carries a meaningless header.
+>
+> If what you actually want are **reserved bytes that are written as well as read**, model them as a
+> field with `[ProtocolBytePadding(Padding = n)]`. That mechanism is symmetric and round trips.
 
 ```c#
 

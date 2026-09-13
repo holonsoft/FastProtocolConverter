@@ -79,6 +79,47 @@ namespace holonsoft.FastProtocolConverter.dto
 		public int ExpectedFieldSize { get; }
 
 		/// <summary>
+		/// Number of bytes this field really occupies in the byte array.
+		/// In contrast to <see cref="ExpectedFieldSize"/> this resolves padding bytes to their repeat
+		/// count, fixed length strings to their reserved length and enums without an explicit
+		/// destination type to the four bytes the converter actually writes for them.
+		/// Returns -1 only for variable length strings, whose size is known at runtime.
+		/// Use this for every bounds, minimum length and overlap calculation.
+		/// </summary>
+		/// <remarks>
+		/// Resolved once during construction. It is invariant for the lifetime of the field info and
+		/// is read for every field of every message, so it must not be recomputed on each access.
+		/// </remarks>
+		public int EffectiveFieldSize { get; private set; }
+
+
+		private void ResolveEffectiveFieldSize()
+		{
+			if (IsPaddingByte)
+			{
+				EffectiveFieldSize = BytePaddingAttribute.Padding;
+				return;
+			}
+
+			if (IsString)
+			{
+				EffectiveFieldSize = (StrAttribute != null) && StrAttribute.IsFixedLengthString
+					? StrAttribute.StringMaxLengthInByteArray
+					: -1;
+				return;
+			}
+
+			// DestinationType.None and .Default are written as Int32, see WriteFieldValueToArray
+			if (IsEnum)
+			{
+				EffectiveFieldSize = ExpectedFieldSize > 0 ? ExpectedFieldSize : 4;
+				return;
+			}
+
+			EffectiveFieldSize = ExpectedFieldSize;
+		}
+
+		/// <summary>
 		/// Shortcut to Field name
 		/// </summary>
 		public string FieldName => FieldInfo.Name;
@@ -89,6 +130,7 @@ namespace holonsoft.FastProtocolConverter.dto
 		public bool UseRangeCheck { get; } = false;
 
 
+		public FieldRangeValue<sbyte> RangeSByte { get; }
 		public FieldRangeValue<int> RangeInt { get; }
 		public FieldRangeValue<uint> RangeUInt { get; }
 		public FieldRangeValue<long> RangeInt64 { get; }
@@ -148,6 +190,8 @@ namespace holonsoft.FastProtocolConverter.dto
 				}
 
 				ExpectedFieldSize = 1;
+
+				ResolveEffectiveFieldSize();
 				return;
 			}
 
@@ -201,6 +245,11 @@ namespace holonsoft.FastProtocolConverter.dto
 			}
 
 
+			// everything the size depends on is known now: ExpectedFieldSize, the padding attribute
+			// and the string attribute. The range block below only adds range values and may return
+			// early, so resolve the size here to cover every remaining exit of this constructor.
+			ResolveEffectiveFieldSize();
+
 			if (!(IsString || IsEnum))
 			{
 				var r = FieldInfo
@@ -236,6 +285,11 @@ namespace holonsoft.FastProtocolConverter.dto
 					case TypeCode.UInt16:
 						RangeUInt16 = new FieldRangeValue<UInt16>(rawRangeAttribute);
 						break;
+					case TypeCode.SByte:
+						RangeSByte = new FieldRangeValue<sbyte>(rawRangeAttribute);
+						break;
+					// NOTE: byte fields never reach this switch, the constructor returns early for them.
+					// Range support for byte is therefore not available, see the IsByte block above.
 					case TypeCode.Decimal:
 						RangeDecimal = new FieldRangeValue<decimal>(rawRangeAttribute);
 						break;
@@ -266,6 +320,8 @@ namespace holonsoft.FastProtocolConverter.dto
 					return RangeInt16.IsInRange((Int16) val);
 				case TypeCode.UInt16:
 					return RangeUInt16.IsInRange((UInt16) val);
+				case TypeCode.SByte:
+					return RangeSByte.IsInRange((sbyte) val);
 				case TypeCode.Decimal:
 					return RangeDecimal.IsInRange((decimal) val);
 				case TypeCode.Single:

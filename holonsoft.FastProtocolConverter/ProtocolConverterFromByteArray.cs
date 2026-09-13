@@ -16,14 +16,53 @@ namespace holonsoft.FastProtocolConverter
 		where T : class, new()
 	{
 
+		/// <summary>
+		/// A byte array that cannot possibly hold the protocol is a protocol condition, not a
+		/// programmer error, so it is reported as ProtocolConverterException in every code path.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void EnsureMinimumLength(byte[] data)
+		{
+			data.Requires(nameof(data)).IsNotNull();
+
+			if (data.Length < _totalMinLength)
+			{
+				var msg = $"Too less data in byte stream, {_totalMinLength} bytes are needed for {typeof(T).Name} but only {data.Length} were provided";
+
+				// the most common way to land exactly 'offset' bytes short is to feed the output of
+				// ConvertToByteArray back in, which does not write the skipped header bytes
+				if ((_globalOffsetInByteArray > 0) && (data.Length + _globalOffsetInByteArray >= _totalMinLength))
+				{
+					msg += $". {typeof(T).Name} declares OffsetInByteArray = {_globalOffsetInByteArray}, and that offset applies to reading only."
+						+ " ConvertToByteArray does not write those leading bytes, so its result has to be prefixed with the frame header before it can be read back."
+						+ " Use ProtocolBytePadding on a field instead if you want reserved bytes that are written as well.";
+				}
+
+				throw new ProtocolConverterException(msg);
+			}
+		}
+
+
+		/// <summary>
+		/// Guards a single field read. Without it a truncated frame surfaced as a raw
+		/// ArgumentException from Array.Copy or BitConverter somewhere deep inside the converter.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void EnsureRoomForField(byte[] data, int position, int requiredBytes, ConverterFieldInfo<T> field)
+		{
+			if ((position < 0) || (requiredBytes < 0) || (position + requiredBytes > data.Length))
+			{
+				throw new ProtocolConverterException(
+					$"Too less data in byte stream, field '{field.FieldName}' needs {requiredBytes} bytes at position {position} but the array holds only {data.Length}");
+			}
+		}
+
+
 		private T ConvertFromByteArray(byte[] data)
 		{
 			IsPrepared.Requires("Prepare()").IsTrue();
 
-			if (_fieldListSeqPos.Count == 0)
-			{
-				data.Requires(nameof(data)).CountIsGreaterThanOrEqual(_totalMinLength);
-			}
+			EnsureMinimumLength(data);
 
 			var result = new T();
 
@@ -47,11 +86,9 @@ namespace holonsoft.FastProtocolConverter
 		private void ConvertFromByteArray(byte[] data, T instance)
 		{
 			IsPrepared.Requires("Prepare()").IsTrue();
+			instance.Requires(nameof(instance)).IsNotNull();
 
-			if (_fieldListSeqPos.Count == 0)
-			{
-				data.Requires(nameof(data)).CountIsGreaterThanOrEqual(_totalMinLength);
-			}
+			EnsureMinimumLength(data);
 
 			var result = instance;
 
@@ -81,13 +118,17 @@ namespace holonsoft.FastProtocolConverter
 			{
 				if (actualPosition > lengthOfData)
 				{
-					throw new ProtocolConverterException("Too less data in byte stream");
+					throw new ProtocolConverterException(
+						$"Too less data in byte stream, position {actualPosition} is behind the end of the {lengthOfData} byte array");
 				}
 
 
 				if (kvp.Value.IsString)
 				{
 					var length = kvp.Value.StrAttribute.IsFixedLengthString? kvp.Value.StrAttribute.StringMaxLengthInByteArray : ReadLengthFieldValue(result, kvp.Value);
+
+					// the length of a variable string comes out of the frame itself and can be a lie
+					EnsureRoomForField(data, actualPosition, length, kvp.Value);
 
 					string dataStr;
 
@@ -145,6 +186,10 @@ namespace holonsoft.FastProtocolConverter
 		{
 			var pos = position == -1 ? kvp.Key + _globalOffsetInByteArray : position;
 
+			// central bounds guard, so no read can run past the end of the array below
+			var effectiveSize = kvp.Value.EffectiveFieldSize;
+
+			if (effectiveSize > 0) EnsureRoomForField(data, pos, effectiveSize, kvp.Value);
 
 			if (kvp.Value.IsBitValue)
 			{
@@ -221,6 +266,12 @@ namespace holonsoft.FastProtocolConverter
 					kvp.Value.Setter(result, data[pos]);
 					return kvp.Value.IsPaddingByte ? kvp.Value.BytePaddingAttribute.Padding : 1;
 
+				case TypeCode.SByte:
+					return SetFieldHandleSByteValues(result, kvp, data, pos);
+
+				case TypeCode.Decimal:
+					return SetFieldHandleDecimalValues(result, kvp, data, pos);
+
 				case TypeCode.Single:
 					return SetFieldHandleFloatValues(result, kvp, data, pos);
 
@@ -239,6 +290,109 @@ namespace holonsoft.FastProtocolConverter
 		}
 
 		
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private int SetFieldHandleSByteValues(T result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, byte[] data, int pos)
+		{
+			// a single byte has no byte order, so UseBigEndian is irrelevant here
+			var sByteVal = unchecked((sbyte) data[pos]);
+
+			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(sByteVal))
+			{
+				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
+
+				OnRangeViolation?.Invoke(kvp.Value.FieldInfo, out behaviourRangeViolation);
+				switch (behaviourRangeViolation)
+				{
+					case ConverterRangeViolationBehaviour.None:
+					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
+						kvp.Value.Setter(result, sByteVal);
+						break;
+					case ConverterRangeViolationBehaviour.SetToMinValue:
+						kvp.Value.Setter(result, kvp.Value.RangeSByte.MinValue);
+						break;
+					case ConverterRangeViolationBehaviour.SetToMaxValue:
+						kvp.Value.Setter(result, kvp.Value.RangeSByte.MaxValue);
+						break;
+					case ConverterRangeViolationBehaviour.SetToDefaultValue:
+						kvp.Value.Setter(result, kvp.Value.RangeSByte.DefaultValue);
+						break;
+					case ConverterRangeViolationBehaviour.ThrowException:
+						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
+				}
+			}
+			else
+			{
+				kvp.Value.Setter(result, sByteVal);
+			}
+
+			return 1;
+		}
+
+
+		/// <summary>
+		/// A decimal is stored as its four component integers (low, mid, high, flags) in exactly that
+		/// order. UseBigEndian swaps the bytes inside every component, the order of the components
+		/// themselves never changes. See <see cref="decimal.GetBits(decimal, Span{int})"/>.
+		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private int SetFieldHandleDecimalValues(T result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, byte[] data, int pos)
+		{
+			Span<int> bits = stackalloc int[4];
+
+			for (var i = 0; i < 4; i++)
+			{
+				var offset = pos + (i * 4);
+
+				bits[i] = UseBigEndian
+					? (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3]
+					: data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+			}
+
+			decimal decimalVal;
+
+			try
+			{
+				decimalVal = new decimal(bits);
+			}
+			catch (ArgumentException ex)
+			{
+				throw new ProtocolConverterException(
+					"Invalid decimal representation in byte stream for field " + kvp.Value.FieldInfo.Name, ex);
+			}
+
+			if (kvp.Value.UseRangeCheck && !kvp.Value.IsInRange(decimalVal))
+			{
+				var behaviourRangeViolation = ConverterRangeViolationBehaviour.None;
+
+				OnRangeViolation?.Invoke(kvp.Value.FieldInfo, out behaviourRangeViolation);
+				switch (behaviourRangeViolation)
+				{
+					case ConverterRangeViolationBehaviour.None:
+					case ConverterRangeViolationBehaviour.IgnoreAndContinue:
+						kvp.Value.Setter(result, decimalVal);
+						break;
+					case ConverterRangeViolationBehaviour.SetToMinValue:
+						kvp.Value.Setter(result, kvp.Value.RangeDecimal.MinValue);
+						break;
+					case ConverterRangeViolationBehaviour.SetToMaxValue:
+						kvp.Value.Setter(result, kvp.Value.RangeDecimal.MaxValue);
+						break;
+					case ConverterRangeViolationBehaviour.SetToDefaultValue:
+						kvp.Value.Setter(result, kvp.Value.RangeDecimal.DefaultValue);
+						break;
+					case ConverterRangeViolationBehaviour.ThrowException:
+						throw new ProtocolConverterException("Field value out of range " + kvp.Value.FieldInfo.Name);
+				}
+			}
+			else
+			{
+				kvp.Value.Setter(result, decimalVal);
+			}
+
+			return 16;
+		}
+
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private int SetFieldHandleDoubleValues(T result, KeyValuePair<int, ConverterFieldInfo<T>> kvp, byte[] data, int pos)
