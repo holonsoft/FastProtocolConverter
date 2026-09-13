@@ -38,6 +38,13 @@ namespace holonsoft.FastProtocolConverter
         private int _stringBufferCapacity;
 
         /// <summary>
+        /// Expected size of a written message, so the result list is allocated once at the right
+        /// size instead of doubling its backing array while the fields are appended.
+        /// A variable length string contributes nothing, the value is a lower bound then.
+        /// </summary>
+        private int _writeSizeEstimate = 16;
+
+        /// <summary>
         /// Culture for the string limits of ProtocolFieldRangeAttribute. Invariant unless the
         /// protocol definition names a different one, never taken from the environment.
         /// </summary>
@@ -257,6 +264,10 @@ namespace holonsoft.FastProtocolConverter
                 .ToList();
 
             _hasStringFields = stringFields.Count > 0;
+
+            var writeList = _fieldListSeqPos.Count == 0 ? _fieldListFixPos.Values : _fieldListSeqPos.Values;
+
+            _writeSizeEstimate = Math.Max(16, writeList.Sum(x => Math.Max(x.EffectiveFieldSize, 0)));
 
             if (_hasStringFields)
             {

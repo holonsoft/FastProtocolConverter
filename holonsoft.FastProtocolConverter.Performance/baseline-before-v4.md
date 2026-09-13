@@ -156,6 +156,39 @@ List<byte>. That is exactly what Phase 3 removes.
 | Read  reused  | 115.58 ns |  90.71 ns | -21.5% | 288 ->  48 B |
 | Write LE      | 245.33 ns | 204.25 ns | -16.7% | 888 -> 648 B |
 
+## Phase 3: allocation free conversion
+
+Removed, all of them once per field per message:
+
+* `BitConverter.GetBytes` allocated a byte[] for every multi byte field written
+* LINQ `Reverse` allocated an iterator on top of that for every big endian field, which is why big
+  endian used to cost almost twice what little endian did
+* the result `List<byte>` grew from nothing, it is sized from the protocol now
+* reading big endian built a scratch byte[] per field to feed BitConverter, `BinaryPrimitives`
+  needs none
+* a Guid allocated a byte[16] on read, plus a LINQ reverse and another array for big endian
+* a string allocated a byte[] on write (`Encoding.GetBytes`), another for the fill character and a
+  string for `char.ToString()`, and a byte[] on read to copy into before decoding
+
+The encoder and the encoded fill bytes are resolved once while preparing. The fill bytes are produced
+with the real encoder on purpose: `(byte) fillChar` would differ from the ASCII fallback for any
+character above 0x7F and would silently change the wire format.
+
+## Result, against the shipped 3.6.1 code (bcea658)
+
+| Method | before | now | time | alloc |
+|---|---:|---:|---:|---|
+| Read  LE      | 118.09 ns |  91.79 ns | -22.3% |  344 -> 104 B |
+| Read  BE      | 146.21 ns |  93.33 ns | -36.2% |  568 -> 104 B |
+| Read  reused  | 115.58 ns |  94.81 ns | -18.0% |  288 ->  48 B |
+| Write LE      | 245.33 ns | 134.93 ns | -45.0% |  888 -> 208 B |
+| Write BE      | 376.86 ns | 134.06 ns | -64.4% | 1528 -> 208 B |
+| Read  string  |  73.96 ns |  64.69 ns | -12.5% |  288 -> 208 B |
+| Write string  | 166.05 ns | 144.35 ns | -13.1% |  384 -> 296 B |
+
+Byte order is free now, in both directions. What is left is structural: the result array itself, the
+List and its backing array on the write side, and the POCO on the read side.
+
 ## Targets for v4
 
 1. Replace `FieldInfo.GetValue` with the compiled getter that already exists unused in `FastInvoke`.

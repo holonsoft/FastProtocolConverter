@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace holonsoft.FastProtocolConverter.dto
 {
@@ -91,6 +92,19 @@ namespace holonsoft.FastProtocolConverter.dto
 
 		/// <inheritdoc cref="TypedSetter"/>
 		public Delegate TypedGetter { get; }
+
+
+		/// <summary>
+		/// Encoder of the string field, resolved once.
+		/// </summary>
+		public Encoding StringEncoding { get; }
+
+		/// <summary>
+		/// Encoded form of FillupCharWhenShorter, resolved once with the real encoder so the ASCII
+		/// fallback for characters above 0x7F stays exactly as it was. Producing this per message
+		/// cost a ToString plus a byte[] on every write.
+		/// </summary>
+		public byte[] StringFillupBytes { get; }
 
 
 		/// <summary>
@@ -321,6 +335,12 @@ namespace holonsoft.FastProtocolConverter.dto
 				if (x != null)
 				{
 					StrAttribute = (ProtocolStringFieldAttribute) x;
+
+					StringEncoding = StrAttribute.Encoder == SupportedEncoder.UnicodeEncoder
+						? Encoding.Unicode
+						: Encoding.ASCII;
+
+					StringFillupBytes = StringEncoding.GetBytes(StrAttribute.FillupCharWhenShorter.ToString());
 				}
 			}
 
