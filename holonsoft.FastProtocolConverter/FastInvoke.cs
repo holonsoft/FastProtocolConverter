@@ -29,44 +29,47 @@ namespace holonsoft.FastProtocolConverter
 
 
         /// <summary>
-        /// Strongly typed setter for a field. In contrast to <see cref="BuildUntypedSetter{T}"/> the
-        /// value never has to be boxed, which matters because this runs for every field of every
-        /// message. TField may be the primitive the protocol carries while the field itself is an
-        /// enum over that primitive, the conversion is then part of the compiled expression.
+        /// Strongly typed setter for a field or a property. In contrast to
+        /// <see cref="BuildUntypedSetter{T}"/> the value never has to be boxed, which matters because
+        /// this runs for every member of every message. TValue may be the primitive the protocol
+        /// carries while the member itself is an enum over that primitive, the conversion is then
+        /// part of the compiled expression.
         /// </summary>
-        public static Action<T, TField> BuildTypedFieldSetter<T, TField>(FieldInfo fieldInfo)
+        public static Action<T, TValue> BuildTypedMemberSetter<T, TValue>(MemberInfo memberInfo)
         {
             var instance = Expression.Parameter(typeof(T), "t");
-            var value = Expression.Parameter(typeof(TField), "v");
+            var value = Expression.Parameter(typeof(TValue), "v");
+
+            var memberType = memberInfo.GetUnderlyingType();
 
             Expression assigned = value;
 
-            if (fieldInfo.FieldType != typeof(TField))
+            if (memberType != typeof(TValue))
             {
-                assigned = Expression.Convert(value, fieldInfo.FieldType);
+                assigned = Expression.Convert(value, memberType);
             }
 
-            var body = Expression.Assign(Expression.Field(instance, fieldInfo), assigned);
+            var body = Expression.Assign(Expression.MakeMemberAccess(instance, memberInfo), assigned);
 
-            return Expression.Lambda<Action<T, TField>>(body, instance, value).Compile();
+            return Expression.Lambda<Action<T, TValue>>(body, instance, value).Compile();
         }
 
 
         /// <summary>
-        /// Strongly typed getter for a field, the counterpart of <see cref="BuildTypedFieldSetter{T,TField}"/>.
+        /// Strongly typed getter, the counterpart of <see cref="BuildTypedMemberSetter{T,TValue}"/>.
         /// </summary>
-        public static Func<T, TField> BuildTypedFieldGetter<T, TField>(FieldInfo fieldInfo)
+        public static Func<T, TValue> BuildTypedMemberGetter<T, TValue>(MemberInfo memberInfo)
         {
             var instance = Expression.Parameter(typeof(T), "t");
 
-            Expression body = Expression.Field(instance, fieldInfo);
+            Expression body = Expression.MakeMemberAccess(instance, memberInfo);
 
-            if (fieldInfo.FieldType != typeof(TField))
+            if (memberInfo.GetUnderlyingType() != typeof(TValue))
             {
-                body = Expression.Convert(body, typeof(TField));
+                body = Expression.Convert(body, typeof(TValue));
             }
 
-            return Expression.Lambda<Func<T, TField>>(body, instance).Compile();
+            return Expression.Lambda<Func<T, TValue>>(body, instance).Compile();
         }
 
 
@@ -100,7 +103,10 @@ namespace holonsoft.FastProtocolConverter
             return action;
         }
 
-        private static Type GetUnderlyingType(this MemberInfo member)
+        /// <summary>
+        /// The type of the value a field or property carries.
+        /// </summary>
+        public static Type GetUnderlyingType(this MemberInfo member)
         {
             switch (member.MemberType)
             {

@@ -76,6 +76,39 @@ namespace holonsoft.FastProtocolConverter
 
 
 		/// <summary>
+		/// Writes the POCO into an <see cref="IBufferWriter{T}"/>, which is how a pipeline hands out
+		/// its buffer. The frame is written into the writer's own memory, so nothing is copied and
+		/// nothing is allocated here.
+		/// </summary>
+		private void ConvertToByteArray(T data, IBufferWriter<byte> bufferWriter)
+		{
+			ThrowIfNotPrepared();
+			ThrowIfNull(data, nameof(data));
+			ThrowIfNull(bufferWriter, nameof(bufferWriter));
+
+			var size = GetByteCountCore(data);
+
+			// GetSpan is free to hand out more than was asked for, and Advance must be told the real
+			// length, so the cursor gets exactly the frame and not whatever the writer had spare
+			var destination = bufferWriter.GetSpan(size).Slice(0, size);
+
+			var writer = new ByteWriter(destination);
+
+			WriteAllFields(ref writer, data);
+
+			if (writer.Overflowed || (writer.Position != size))
+			{
+				throw new ProtocolConverterException(
+					$"Internal size mismatch while writing {typeof(T).Name}: {size} bytes were calculated"
+					+ $" but the writer produced {(writer.Overflowed ? "more" : writer.Position.ToString())}."
+					+ " This is a bug in FastProtocolConverter, please report it with the protocol definition.");
+			}
+
+			bufferWriter.Advance(size);
+		}
+
+
+		/// <summary>
 		/// Exact number of bytes <paramref name="data"/> will produce, so a caller can size a buffer
 		/// for <see cref="TryConvertToByteArray"/>.
 		///
@@ -248,7 +281,7 @@ namespace holonsoft.FastProtocolConverter
 		{
 			var lengthField = _fieldListByName[field.StrAttribute.LengthFieldName];
 
-			var lengthFieldType = lengthField.FieldInfo.FieldType;
+			var lengthFieldType = lengthField.MemberType;
 
 			if (lengthFieldType == typeof(int))
 			{

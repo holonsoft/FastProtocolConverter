@@ -681,30 +681,30 @@ namespace holonsoft.FastProtocolConverter.Test
 		}
 
 
-		private void OnRangeViolationSetToDefaultVal(FieldInfo FieldInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
+		private void OnRangeViolationSetToDefaultVal(MemberInfo memberInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
 		{
 			rangeViolationBehaviour = ConverterRangeViolationBehaviour.SetToDefaultValue;
 		}
 
-		private void OnRangeViolationSetToMinVal(FieldInfo fieldInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
+		private void OnRangeViolationSetToMinVal(MemberInfo memberInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
 		{
 			rangeViolationBehaviour = ConverterRangeViolationBehaviour.SetToMinValue;
 		}
 
 
-		private void OnRangeViolationSetToMaxVal(FieldInfo fieldInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
+		private void OnRangeViolationSetToMaxVal(MemberInfo memberInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
 		{
 			rangeViolationBehaviour = ConverterRangeViolationBehaviour.SetToMaxValue;
 		}
 
 
-		private void OnRangeViolationIgnore(FieldInfo fieldInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
+		private void OnRangeViolationIgnore(MemberInfo memberInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
 		{
 			rangeViolationBehaviour = ConverterRangeViolationBehaviour.IgnoreAndContinue;
 		}
 
 
-		private void OnRangeViolationStop(FieldInfo fieldInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
+		private void OnRangeViolationStop(MemberInfo memberInfo, out ConverterRangeViolationBehaviour rangeViolationBehaviour)
 		{
 			rangeViolationBehaviour = ConverterRangeViolationBehaviour.ThrowException;
 		}

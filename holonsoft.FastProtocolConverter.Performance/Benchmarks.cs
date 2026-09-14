@@ -47,6 +47,13 @@ namespace holonsoft.FastProtocolConverter.Performance
 		/// A buffer the caller owns and reuses, which is the point of TryConvertToByteArray.
 		/// </summary>
 		private byte[] _writeBuffer;
+
+		private IProtocolConverter<BenchmarkPropertyPoco> _properties;
+		private BenchmarkPropertyPoco _propertySource;
+		private BenchmarkPropertyPoco _propertyReusable;
+		private byte[] _propertyPayload;
+
+		private System.Buffers.ArrayBufferWriter<byte> _bufferWriter;
 		private int _frameOffset;
 		private int _frameLength;
 
@@ -138,6 +145,28 @@ namespace holonsoft.FastProtocolConverter.Performance
 			_advancedBigEndianPayload = _advancedBigEndian.ConvertToByteArray(_advancedBigEndianSource);
 
 			_writeBuffer = new byte[256];
+
+			_properties = new ProtocolConverter<BenchmarkPropertyPoco>(null);
+			_properties.Prepare();
+
+			_propertySource = new BenchmarkPropertyPoco
+			{
+				IntField = _littleSource.IntField,
+				UIntField = _littleSource.UIntField,
+				ShortField = _littleSource.ShortField,
+				UShortField = _littleSource.UShortField,
+				ByteField = _littleSource.ByteField,
+				BoolField = _littleSource.BoolField,
+				FloatField = _littleSource.FloatField,
+				DoubleField = _littleSource.DoubleField,
+				LongField = _littleSource.LongField,
+				EnumField = _littleSource.EnumField,
+			};
+
+			_propertyReusable = new BenchmarkPropertyPoco();
+			_propertyPayload = _properties.ConvertToByteArray(_propertySource);
+
+			_bufferWriter = new System.Buffers.ArrayBufferWriter<byte>(4096);
 		}
 
 
@@ -216,6 +245,30 @@ namespace holonsoft.FastProtocolConverter.Performance
 		}
 
 
+		[Benchmark(Description = "Read  38 byte POCO of properties")]
+		public BenchmarkPropertyPoco ReadProperties()
+			=> _properties.ConvertFromByteArray(_propertyPayload);
+
+
+		[Benchmark(Description = "Read  38 byte POCO of properties, reused instance")]
+		public void ReadPropertiesIntoExistingInstance()
+			=> _properties.ConvertFromByteArray(_propertyPayload, _propertyReusable);
+
+
+		[Benchmark(Description = "Write 38 byte POCO of properties")]
+		public byte[] WriteProperties()
+			=> _properties.ConvertToByteArray(_propertySource);
+
+
+		[Benchmark(Description = "Write 38 byte POCO into an IBufferWriter")]
+		public int WriteIntoBufferWriter()
+		{
+			_bufferWriter.ResetWrittenCount();
+			_littleEndian.ConvertToByteArray(_littleSource, _bufferWriter);
+			return _bufferWriter.WrittenCount;
+		}
+
+
 		[Benchmark(Description = "Read  POCO with fixed length string")]
 		public BenchmarkStringPoco ReadWithString()
 			=> _withStrings.ConvertFromByteArray(_stringPayload);
@@ -260,6 +313,25 @@ namespace holonsoft.FastProtocolConverter.Performance
 
 		[ProtocolField(StartPos = 12)] public Guid GuidField;
 		[ProtocolField(StartPos = 28)] public decimal DecimalField;
+	}
+
+
+	/// <summary>
+	/// Exactly the layout of <see cref="BenchmarkPoco"/>, declared as properties instead of fields,
+	/// so the cost of property support is measurable rather than assumed.
+	/// </summary>
+	public class BenchmarkPropertyPoco
+	{
+		[ProtocolField(StartPos = 0)] public int IntField { get; set; }
+		[ProtocolField(StartPos = 4)] public uint UIntField { get; set; }
+		[ProtocolField(StartPos = 8)] public short ShortField { get; set; }
+		[ProtocolField(StartPos = 10)] public ushort UShortField { get; set; }
+		[ProtocolField(StartPos = 12)] public byte ByteField { get; set; }
+		[ProtocolField(StartPos = 13)] public bool BoolField { get; set; }
+		[ProtocolField(StartPos = 14)] public float FloatField { get; set; }
+		[ProtocolField(StartPos = 18)] public double DoubleField { get; set; }
+		[ProtocolField(StartPos = 26)] public long LongField { get; set; }
+		[ProtocolField(StartPos = 34, TypeInByteArray = DestinationType.Int32)] public BenchmarkEnum EnumField { get; set; }
 	}
 
 

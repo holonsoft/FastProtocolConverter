@@ -3,7 +3,7 @@ using System;
 
 namespace holonsoft.FastProtocolConverter.Abstractions.Attributes
 {
-	[AttributeUsage(AttributeTargets.Field)]
+	[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
 	public class ProtocolDateTimeFieldAttribute: Attribute
 	{
 		public DateTimeKind DateTimeKind { get; set; }
