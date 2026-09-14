@@ -324,7 +324,7 @@ namespace holonsoft.FastProtocolConverter.Test
 				// so the violation fires either way and only the replacement value tells them apart
 				var payload = converter.ConvertToByteArray(new PocoWithRanges { FloatField = 99f, DoubleField = 99d });
 
-				void SetToMin(System.Reflection.FieldInfo field, out Abstractions.Enums.ConverterRangeViolationBehaviour chosen)
+				void SetToMin(System.Reflection.MemberInfo member, out Abstractions.Enums.ConverterRangeViolationBehaviour chosen)
 					=> chosen = Abstractions.Enums.ConverterRangeViolationBehaviour.SetToMinValue;
 
 				converter.OnRangeViolation += SetToMin;

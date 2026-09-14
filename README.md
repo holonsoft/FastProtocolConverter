@@ -1,14 +1,70 @@
 ﻿# FastProtocolConverter
-Supports NET8, NET9 and NET10
 
+Converts raw bytes, for example from a hardware device, into an instance of a class and back again.
+You describe the frame with attributes on a POCO, and the converter does the rest.
 
-Converts raw bytes (e. g. from a hardware device) data to an instance of a class or vice versa
+Supports .NET 8, .NET 9 and .NET 10.
 
-At a glance
-Support for
-* uint16|32|64, int16|32|64, decimal, single, double, byte, sbyte 
-* Guid, DateTime, Boolean, Enums, strings
-* Support for endianess
+## Fast, and measurably so
+
+Version 4.0 is a rewrite of both conversion paths. A 38 byte frame containing every supported
+primitive, on the same machine, same benchmark code on both sides:
+
+| | 3.6.1 | 4.0 | faster by |
+|---|---:|---:|---:|
+| Read, little endian | 118.09 ns / 344 B | **58.65 ns / 56 B** | 50% |
+| Read, big endian | 146.21 ns / 568 B | **58.19 ns / 56 B** | 60% |
+| Read into a reused instance | 115.58 ns / 288 B | **28.92 ns / 0 B** | 75% |
+| Write, little endian | 245.33 ns / 888 B | **55.76 ns / 64 B** | 77% |
+| Write, big endian | 376.86 ns / 1528 B | **56.06 ns / 64 B** | 85% |
+| Read a frame with a string | 73.96 ns / 288 B | **28.12 ns / 160 B** | 62% |
+| Write a frame with a string | 166.05 ns / 384 B | **44.08 ns / 64 B** | 74% |
+
+**Byte order is free.** Big endian used to cost up to 55% more than little endian in both
+directions. It now costs nothing, which matters if your devices speak network byte order.
+
+**Nothing is allocated per message.** Read into an instance you keep and write into a buffer you
+own, and the converter allocates **zero bytes per frame**:
+
+```c#
+    var frame = new byte[converter.GetByteCount(reading)];
+    var reusable = new SensorReading();
+
+    while (running)
+    {
+        var count = socket.Receive(receiveBuffer);
+
+        converter.ConvertFromByteArray(receiveBuffer.AsSpan(0, count), reusable);   // 0 B
+        Process(reusable);
+
+        converter.TryConvertToByteArray(reply, frame, out var written);             // 0 B
+        socket.Send(frame, written, SocketFlags.None);
+    }
+```
+
+At 100.000 messages per second the 3.6.1 write path produced roughly 89 MB/s of garbage in little
+endian and 153 MB/s in big endian, before any of your own code ran. Version 4.0 produces 6.4 MB/s,
+or none at all into a reused buffer. In a long running process that is the difference between
+regular gen0 collections and effectively none.
+
+Every number above comes from a back to back A/B run of the same tree, with the rows the change
+could not reach kept in the table as a control.
+[`baseline-before-v4.md`](holonsoft.FastProtocolConverter.Performance/baseline-before-v4.md)
+records how each one was measured and which approaches were tried and rejected. And the byte exact
+golden vectors in the test suite were written once, before the rewrite, and never regenerated: the
+wire format did not move a single byte.
+
+## At a glance
+
+* `uint16|32|64`, `int16|32|64`, `decimal`, `single`, `double`, `byte`, `sbyte`
+* `Guid`, `DateTime`, `bool`, enums, strings
+* Little and big endian, per protocol
+* Fixed position frames and sequence based frames with variable length strings
+* Fields **and properties**, including `init` only and private setters
+* Read from a `byte[]` or a `ReadOnlySpan<byte>`, write to a `byte[]`, a `Span<byte>` you own, or an
+  `IBufferWriter<byte>`
+* Range limits per field, with a handler that decides what to do about a violation
+* A prepared converter is safe to share between threads
 
 ### Wire format of the scalar types
 
@@ -70,6 +126,66 @@ thread, before the converter is handed out.
 Both conversion directions keep every piece of per message state on the stack. Reading into a
 **reused instance** is of course only safe if that instance belongs to the calling thread, a POCO
 handed to two threads at once is a data race like any other object.
+
+### Fields or properties, as you prefer
+
+A protocol member can be a field or a property. The same attributes work on both, and the produced
+bytes are identical, so you can move a POCO from one to the other without touching the wire format:
+
+```c#
+    public class SensorReading
+    {
+        [ProtocolField(StartPos = 0)]
+        public int DeviceId { get; set; }
+
+        [ProtocolField(StartPos = 4)]
+        public float Temperature { get; set; }
+    }
+```
+
+A private setter or an `init` only setter is fine, so a POCO can stay immutable from the outside and
+still be filled from a frame:
+
+```c#
+    [ProtocolField(StartPos = 0)]
+    public int DeviceId { get; init; }
+```
+
+Properties cost nothing. The accessors are compiled expressions in both cases, and the JIT inlines
+an auto property accessor into the same code a field access produces. Measured on the same 38 byte
+frame: reading 58.91 ns as fields against 60.76 ns as properties, writing 57.02 ns against 56.83 ns,
+with identical allocation.
+
+A property that carries a protocol attribute but has **no** setter is rejected at `Prepare()`,
+because reading a frame would have to assign it. Computed properties, indexers and static properties
+without the attribute are simply ignored, so they can sit next to the protocol members undisturbed.
+
+### Writing into a buffer you already have
+
+Three ways to write, all producing the same bytes because they share one writer:
+
+```c#
+    // 1. the simple one, allocates the result array
+    byte[] frame = converter.ConvertToByteArray(reading);
+
+    // 2. into a buffer you own, allocates nothing
+    Span<byte> buffer = stackalloc byte[converter.GetByteCount(reading)];
+    if (converter.TryConvertToByteArray(reading, buffer, out var written)) { ... }
+
+    // 3. into a pipeline, allocates nothing
+    converter.ConvertToByteArray(reading, pipeWriter);
+```
+
+`GetByteCount` is exact, not an upper bound. For a protocol whose length does not depend on the
+values, which is every protocol without a variable length string, it is a field read and costs
+nothing.
+
+`TryConvertToByteArray` returns `false` rather than throwing when the destination is too small, so a
+loop may probe with a buffer and grow it. Nothing meaningful is written in that case.
+
+Writing into a buffer you own costs 56.15 ns for the 38 byte frame and allocates nothing. Through an
+`IBufferWriter` it is 57.17 ns, also nothing: a pipeline pays about a nanosecond for the `GetSpan`
+and `Advance` pair.
 
 ### Error handling when reading
 
@@ -477,6 +593,24 @@ frame could not be read back by this very converter. Frames of such a protocol w
 malformed and will not match what 4.0 writes. Protocols whose fill character is one byte wide, or
 whose declared length divides by the fill width, are unaffected, which is almost all of them.
 
+**6. A range violation handler receives a `MemberInfo`, not a `FieldInfo`.**
+A protocol member can be a property now, and `FieldInfo` cannot describe one. The fix is one word:
+
+```c#
+    // 3.x
+    void OnRangeViolation(FieldInfo field, out ConverterRangeViolationBehaviour behaviour)
+
+    // 4.0
+    void OnRangeViolation(MemberInfo member, out ConverterRangeViolationBehaviour behaviour)
+```
+
+A handler that only reads `member.Name` needs nothing else. One that read `field.FieldType` has to
+ask the member, since `MemberInfo` carries no type of its own:
+
+```c#
+    var type = member is PropertyInfo p ? p.PropertyType : ((FieldInfo) member).FieldType;
+```
+
 ### Fixed in 4.0
 
 * **A prepared converter is now thread safe.** Both directions kept per message state on the shared
@@ -491,22 +625,8 @@ whose declared length divides by the fill width, are unaffected, which is almost
 
 ### And it is quite a bit faster
 
-Against 3.6.1, on a 38 byte frame with every primitive:
-
-| | 3.6.1 | 4.0 | |
-|---|---:|---:|---|
-| Read, little endian | 118.09 ns / 344 B | 58.65 ns / 56 B | -50% |
-| Read, big endian | 146.21 ns / 568 B | 58.19 ns / 56 B | -60% |
-| Read into a reused instance | 115.58 ns / 288 B | 28.92 ns / **0 B** | -75% |
-| Write, little endian | 245.33 ns / 888 B | 55.76 ns / 64 B | -77% |
-| Write, big endian | 376.86 ns / 1528 B | 56.06 ns / 64 B | -85% |
-| Read with a string | 73.96 ns / 288 B | 28.12 ns / 160 B | -62% |
-| Write with a string | 166.05 ns / 384 B | 44.08 ns / 64 B | -74% |
-
-Byte order is free now, in both directions. Reading into a reused instance and writing into a buffer
-you supply allocate **nothing per message**, and reading a frame out of a receive buffer without
-copying it first costs 30 ns. See
-`holonsoft.FastProtocolConverter.Performance/baseline-before-v4.md` for how every one of those
-numbers was measured.
+See [Fast, and measurably so](#fast-and-measurably-so) at the top: between 50% and 85% depending on
+the direction and byte order, and no allocation per message at all when you reuse the instance and
+the buffer.
 
 We hope this software is helpful for your project. Do not hesiate to contact us and ask for new features or report a bug.

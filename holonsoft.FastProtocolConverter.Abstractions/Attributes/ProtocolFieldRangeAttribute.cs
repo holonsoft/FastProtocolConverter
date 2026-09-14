@@ -11,7 +11,7 @@ namespace holonsoft.FastProtocolConverter.Abstractions.Attributes
     /// 
     /// Ranges are not supported for STRING and ENUM fields
     /// </summary>
-    [AttributeUsage(AttributeTargets.Field)]
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
     public class ProtocolFieldRangeAttribute : Attribute
     {
         public string MinValue { get; set; }

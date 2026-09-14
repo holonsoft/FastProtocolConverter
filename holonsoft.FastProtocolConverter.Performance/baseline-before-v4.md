@@ -422,6 +422,38 @@ without copying it first costs 29.69 ns.
 At 100.000 messages per second the write path used to produce about 89 MB/s of garbage in little
 endian and 153 MB/s in big endian. It now produces 6.4 MB/s, or none at all into a reused buffer.
 
+## Phase 5: properties, and what they cost
+
+A protocol member may be a property since 4.0. The question worth measuring was whether that costs
+anything, because a property is a method call where a field is a memory offset.
+
+`BenchmarkPropertyPoco` is `BenchmarkPoco` declared as properties, same layout, same values:
+
+| Method | fields | properties |
+|---|---:|---:|
+| Read  38 byte POCO         | 58.91 ns / 56 B | 60.76 ns / 56 B |
+| Read  into reused instance | 31.24 ns /  0 B | 28.40 ns /  0 B |
+| Write 38 byte POCO         | 57.02 ns / 64 B | 56.83 ns / 64 B |
+
+**It costs nothing.** The accessors are compiled expressions either way, `MakeMemberAccess` emits a
+call to the getter or setter, and the JIT inlines a trivial auto property accessor into the same
+code a field access would have produced. The read row is 3% apart and the other two are inside the
+noise in the other direction.
+
+That also means there was never a reason to keep properties out. The old restriction came from
+`FieldInfo` being wired through `ConverterFieldInfo`, `FastInvoke` and the range violation event,
+not from anything about the conversion itself.
+
+### The IBufferWriter overload
+
+| Method | | |
+|---|---:|---:|
+| Write into a reused buffer  | 56.15 ns | 0 B |
+| Write into an IBufferWriter | 57.17 ns | 0 B |
+
+A pipeline pays about a nanosecond over a buffer you own yourself, for the `GetSpan` and `Advance`
+call pair, and allocates nothing either.
+
 ## A note for the other holonsoft packages
 
 `holonsoft.FluentConditions` 3.0.1, `holonsoft.FluentDateTime` 2.1.1 and `holonsoft.Utils` 1.10.1

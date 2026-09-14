@@ -80,6 +80,19 @@ namespace holonsoft.FastProtocolConverter.Abstractions.Interfaces
 		bool TryConvertToByteArray(T data, Span<byte> destination, out int bytesWritten);
 
 		/// <summary>
+		/// Converts a POCO into an <see cref="System.Buffers.IBufferWriter{T}"/>, which is how a
+		/// pipeline hands out its buffer.
+		/// </summary>
+		/// <remarks>
+		/// Use this when the destination is a <c>PipeWriter</c> or an <c>ArrayBufferWriter</c>, and
+		/// <see cref="TryConvertToByteArray"/> when you already hold the buffer yourself. Both write
+		/// through the same code, so both produce the same bytes.
+		/// </remarks>
+		/// <param name="data">POCO instance</param>
+		/// <param name="bufferWriter">the writer to write the frame into</param>
+		void ConvertToByteArray(T data, System.Buffers.IBufferWriter<byte> bufferWriter);
+
+		/// <summary>
 		/// Exact number of bytes this POCO will produce, to size a buffer for
 		/// <see cref="TryConvertToByteArray"/>.
 		/// </summary>

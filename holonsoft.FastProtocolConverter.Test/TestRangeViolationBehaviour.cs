@@ -90,7 +90,7 @@ namespace holonsoft.FastProtocolConverter.Test
 			var converter = CreateConverter<AllNumericRangesPoco>(_logger);
 			var payload = converter.ConvertToByteArray(OutOfRangeLittleEndian());
 
-			void Handler(FieldInfo field, out ConverterRangeViolationBehaviour chosen) => chosen = behaviour;
+			void Handler(MemberInfo member, out ConverterRangeViolationBehaviour chosen) => chosen = behaviour;
 
 			converter.OnRangeViolation += Handler;
 			try
@@ -172,7 +172,7 @@ namespace holonsoft.FastProtocolConverter.Test
 			var converter = CreateConverter<AllNumericRangesPoco>(_logger);
 			var payload = converter.ConvertToByteArray(OutOfRangeLittleEndian());
 
-			void Handler(FieldInfo field, out ConverterRangeViolationBehaviour chosen)
+			void Handler(MemberInfo member, out ConverterRangeViolationBehaviour chosen)
 				=> chosen = ConverterRangeViolationBehaviour.ThrowException;
 
 			converter.OnRangeViolation += Handler;
@@ -202,7 +202,7 @@ namespace holonsoft.FastProtocolConverter.Test
 			var converter = CreateConverter<AllNumericRangesBigEndianPoco>(_logger);
 			var payload = converter.ConvertToByteArray(OutOfRangeBigEndian());
 
-			void Handler(FieldInfo field, out ConverterRangeViolationBehaviour chosen) => chosen = behaviour;
+			void Handler(MemberInfo member, out ConverterRangeViolationBehaviour chosen) => chosen = behaviour;
 
 			converter.OnRangeViolation += Handler;
 			AllNumericRangesBigEndianPoco big;
@@ -246,7 +246,7 @@ namespace holonsoft.FastProtocolConverter.Test
 
 			var violations = 0;
 
-			void Handler(FieldInfo field, out ConverterRangeViolationBehaviour chosen)
+			void Handler(MemberInfo member, out ConverterRangeViolationBehaviour chosen)
 			{
 				violations++;
 				chosen = ConverterRangeViolationBehaviour.IgnoreAndContinue;

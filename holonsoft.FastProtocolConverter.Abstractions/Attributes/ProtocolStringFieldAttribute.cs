@@ -6,7 +6,7 @@ namespace holonsoft.FastProtocolConverter.Abstractions.Attributes
     /// <summary>
     /// Field attributes to define and control behaviour of converter
     /// </summary>
-    [AttributeUsage(AttributeTargets.Field)]
+    [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
     public class ProtocolStringFieldAttribute : Attribute
     {
         /// <summary>

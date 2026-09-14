@@ -69,9 +69,18 @@ namespace holonsoft.FastProtocolConverter.dto
 		public bool IsGuid { get; }
 
 		/// <summary>
-		/// Underlying field
+		/// The underlying member of the POCO, a field or a property.
 		/// </summary>
-		public FieldInfo FieldInfo { get; }
+		/// <remarks>
+		/// This replaced a FieldInfo in 4.0, when properties became supported. Use
+		/// <see cref="MemberType"/> rather than casting, a property is a PropertyInfo here.
+		/// </remarks>
+		public MemberInfo Member { get; }
+
+		/// <summary>
+		/// Type of the value the member carries, the counterpart of FieldInfo.FieldType.
+		/// </summary>
+		public Type MemberType { get; }
 
 		public Action<T, object> Setter { get; }
 
@@ -126,11 +135,11 @@ namespace holonsoft.FastProtocolConverter.dto
 		/// Builds the typed pair for the field. For an enum the protocol carries a primitive, so the
 		/// accessor is typed on that primitive and the compiled expression converts.
 		/// </summary>
-		private void BuildTypedAccessors(FieldInfo fieldInfo, out Delegate setter, out Delegate getter)
+		private void BuildTypedAccessors(MemberInfo memberInfo, out Delegate setter, out Delegate getter)
 		{
 			// An enum is always carried as int here: the read path assembles the raw value as an int
 			// for every DestinationType it supports, and the compiled expression converts to the enum.
-			var accessAs = IsEnum ? typeof(int) : fieldInfo.FieldType;
+			var accessAs = IsEnum ? typeof(int) : MemberType;
 
 			if (IsString || accessAs == typeof(string))
 			{
@@ -140,15 +149,15 @@ namespace holonsoft.FastProtocolConverter.dto
 			}
 
 			var setterBuilder = typeof(FastInvoke)
-				.GetMethod(nameof(FastInvoke.BuildTypedFieldSetter))
+				.GetMethod(nameof(FastInvoke.BuildTypedMemberSetter))
 				.MakeGenericMethod(typeof(T), accessAs);
 
 			var getterBuilder = typeof(FastInvoke)
-				.GetMethod(nameof(FastInvoke.BuildTypedFieldGetter))
+				.GetMethod(nameof(FastInvoke.BuildTypedMemberGetter))
 				.MakeGenericMethod(typeof(T), accessAs);
 
-			setter = (Delegate) setterBuilder.Invoke(null, [fieldInfo]);
-			getter = (Delegate) getterBuilder.Invoke(null, [fieldInfo]);
+			setter = (Delegate) setterBuilder.Invoke(null, [memberInfo]);
+			getter = (Delegate) getterBuilder.Invoke(null, [memberInfo]);
 		}
 
 		/// <summary>
@@ -200,7 +209,7 @@ namespace holonsoft.FastProtocolConverter.dto
 		/// <summary>
 		/// Shortcut to Field name
 		/// </summary>
-		public string FieldName => FieldInfo.Name;
+		public string FieldName => Member.Name;
 
 		/// <summary>
 		/// TypeCode of the underlying field, resolved once. Type.GetTypeCode used to be called for
@@ -226,35 +235,36 @@ namespace holonsoft.FastProtocolConverter.dto
 		/// Culture for the string limits of a ProtocolFieldRangeAttribute. Null means invariant,
 		/// which is the default. See ProtocolSetupArgument.RangeCulture.
 		/// </param>
-		public ConverterFieldInfo(FieldInfo fieldInfo, ProtocolFieldAttribute attribute, CultureInfo rangeCulture = null)
+		public ConverterFieldInfo(MemberInfo memberInfo, ProtocolFieldAttribute attribute, CultureInfo rangeCulture = null)
 		{
 			rangeCulture ??= CultureInfo.InvariantCulture;
 
-			FieldInfo = fieldInfo;
-			FieldTypeCode = Type.GetTypeCode(fieldInfo.FieldType);
+			Member = memberInfo;
+			MemberType = memberInfo.GetUnderlyingType();
+			FieldTypeCode = Type.GetTypeCode(MemberType);
 
-			Setter = FastInvoke.BuildUntypedSetter<T>(fieldInfo);
-			Getter = FastInvoke.BuildUntypedGetter<T>(fieldInfo);
+			Setter = FastInvoke.BuildUntypedSetter<T>(memberInfo);
+			Getter = FastInvoke.BuildUntypedGetter<T>(memberInfo);
 
 
 			Attribute = attribute;
 
-			IsString = FieldInfo.FieldType == typeof(string);
-			IsEnum = FieldInfo.FieldType.IsEnum;
-			IsDateTime = FieldInfo.FieldType == typeof(DateTime);
-			IsGuid = FieldInfo.FieldType == typeof(Guid);
-			IsByte = FieldInfo.FieldType == typeof(byte);
+			IsString = MemberType == typeof(string);
+			IsEnum = MemberType.IsEnum;
+			IsDateTime = MemberType == typeof(DateTime);
+			IsGuid = MemberType == typeof(Guid);
+			IsByte = MemberType == typeof(byte);
 
 			IsBitValue = Attribute.TypeInByteArray == DestinationType.Bits;
 
 			// needs Attribute, IsEnum and IsString, and must happen before the early return for byte
-			BuildTypedAccessors(fieldInfo, out var typedSetter, out var typedGetter);
+			BuildTypedAccessors(memberInfo, out var typedSetter, out var typedGetter);
 			TypedSetter = typedSetter;
 			TypedGetter = typedGetter;
 
 			if (IsDateTime)
 			{
-				var x = FieldInfo
+				var x = Member
 					.GetCustomAttributes(false)
 					.FirstOrDefault(y => y.GetType() == typeof(ProtocolDateTimeFieldAttribute));
 
@@ -272,7 +282,7 @@ namespace holonsoft.FastProtocolConverter.dto
 			
 			if (IsByte)
 			{
-				var x = FieldInfo
+				var x = Member
 					.GetCustomAttributes(false)
 					.FirstOrDefault(y => y.GetType() == typeof(ProtocolBytePaddingAttribute));
 
@@ -291,10 +301,10 @@ namespace holonsoft.FastProtocolConverter.dto
 
 			if (! (IsDateTime || IsByte))
 			{
-				ExpectedFieldSize = IsString || IsEnum ? -1 : Marshal.SizeOf(FieldInfo.FieldType);
+				ExpectedFieldSize = IsString || IsEnum ? -1 : Marshal.SizeOf(MemberType);
 			}
 			
-			if (FieldInfo.FieldType == typeof(bool))
+			if (MemberType == typeof(bool))
 			{
 				ExpectedFieldSize = 1;
 			}
@@ -328,7 +338,7 @@ namespace holonsoft.FastProtocolConverter.dto
 
 			if (IsString)
 			{
-				var x = FieldInfo
+				var x = Member
 					.GetCustomAttributes(false)
 					.FirstOrDefault(y => y.GetType() == typeof(ProtocolStringFieldAttribute));
 
@@ -352,7 +362,7 @@ namespace holonsoft.FastProtocolConverter.dto
 
 			if (!(IsString || IsEnum))
 			{
-				var r = FieldInfo
+				var r = Member
 					.GetCustomAttributes(false)
 					.FirstOrDefault(y => y.GetType() == typeof(ProtocolFieldRangeAttribute));
 

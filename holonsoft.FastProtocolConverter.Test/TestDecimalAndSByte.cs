@@ -220,7 +220,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		{
 			var converter = CreateConverter<DecimalAndSByteWithRangesPoco>(_logger);
 
-			void Handler(FieldInfo field, out ConverterRangeViolationBehaviour chosen) => chosen = behaviour;
+			void Handler(MemberInfo member, out ConverterRangeViolationBehaviour chosen) => chosen = behaviour;
 
 			converter.OnRangeViolation += Handler;
 			try
@@ -245,7 +245,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		{
 			var converter = CreateConverter<DecimalAndSByteWithRangesPoco>(_logger);
 
-			void Handler(FieldInfo field, out ConverterRangeViolationBehaviour chosen)
+			void Handler(MemberInfo member, out ConverterRangeViolationBehaviour chosen)
 				=> chosen = ConverterRangeViolationBehaviour.ThrowException;
 
 			converter.OnRangeViolation += Handler;
@@ -281,7 +281,7 @@ namespace holonsoft.FastProtocolConverter.Test
 
 				var payload = converter.ConvertToByteArray(new GermanRangeCulturePoco { FloatField = 99f });
 
-				void SetToMin(FieldInfo field, out ConverterRangeViolationBehaviour chosen)
+				void SetToMin(MemberInfo member, out ConverterRangeViolationBehaviour chosen)
 					=> chosen = ConverterRangeViolationBehaviour.SetToMinValue;
 
 				converter.OnRangeViolation += SetToMin;
@@ -350,7 +350,7 @@ namespace holonsoft.FastProtocolConverter.Test
 		{
 			var converter = CreateConverter<DecimalAndSByteWithRangesPoco>(_logger);
 
-			void Handler(FieldInfo field, out ConverterRangeViolationBehaviour chosen)
+			void Handler(MemberInfo member, out ConverterRangeViolationBehaviour chosen)
 				=> chosen = ConverterRangeViolationBehaviour.ThrowException;
 
 			converter.OnRangeViolation += Handler;

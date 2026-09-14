@@ -140,6 +140,62 @@ namespace holonsoft.FastProtocolConverter
             => throw new ArgumentNullException(parameterName, $"'{parameterName}' is null!");
 
 
+        /// <summary>
+        /// Every member of the POCO that could carry a protocol attribute, fields and properties
+        /// alike. Properties are supported since 4.0.
+        /// </summary>
+        /// <remarks>
+        /// A member the converter cannot fill is skipped silently unless it actually claims to be
+        /// part of the protocol, so an ordinary computed property next to the protocol members does
+        /// not stop Prepare(). A get only property that does carry the attribute is an error worth
+        /// reporting: the converter has to assign it when reading a frame.
+        ///
+        /// A property with a private or init only setter is fine. The compiled accessor assigns it
+        /// directly and neither restriction exists at that level.
+        /// </remarks>
+        private IEnumerable<MemberInfo> GetProtocolMembers()
+        {
+            var pocoType = _templateInstance.GetType();
+
+            foreach (var field in pocoType.GetFields())
+            {
+                if (field.IsInitOnly || field.IsLiteral || field.IsStatic) continue;
+
+                yield return field;
+            }
+
+            foreach (var property in pocoType.GetProperties())
+            {
+                // an indexer is not a protocol member and cannot be addressed without arguments
+                if (property.GetIndexParameters().Length > 0) continue;
+
+                if ((property.GetMethod == null) || property.GetMethod.IsStatic) continue;
+
+                if (!property.CanWrite || (property.SetMethod == null))
+                {
+                    var declared = (ProtocolFieldAttribute) property
+                        .GetCustomAttributes(typeof(ProtocolFieldAttribute), false)
+                        .FirstOrDefault();
+
+                    if ((declared != null) && !declared.IgnoreField)
+                    {
+                        var msg = $"Property '{property.Name}' of {typeof(T).Name} carries a {nameof(ProtocolFieldAttribute)}"
+                            + " but has no setter. Reading a frame has to assign it, so a get only property cannot be part of"
+                            + " a protocol. Give it a setter, which may be private or init only, or set IgnoreField = true.";
+
+                        _logger?.Log(LogLevel.Critical, $"{_moduleName}{MethodBase.GetCurrentMethod()?.Name} {msg}");
+
+                        throw new ProtocolConverterException(msg);
+                    }
+
+                    continue;
+                }
+
+                yield return property;
+            }
+        }
+
+
         private void Prepare()
         {
             IsPrepared.Requires(nameof(IsPrepared)).IsFalse(); 
@@ -160,12 +216,11 @@ namespace holonsoft.FastProtocolConverter
                 _globalOffsetInByteArray = 0;
             }
 
-            foreach (var info in from field in _templateInstance.GetType().GetFields()
-                                 where !field.IsInitOnly && !field.IsLiteral && !field.IsStatic
-                                 let attributes = field.GetCustomAttributes(typeof(ProtocolFieldAttribute), false)
+            foreach (var info in from member in GetProtocolMembers()
+                                 let attributes = member.GetCustomAttributes(typeof(ProtocolFieldAttribute), false)
                                  let attribute = (attributes.Length == 1) ? (ProtocolFieldAttribute)attributes[0] : null
                                  where attribute != null
-                                 select new ConverterFieldInfo<T>(field, attribute, _rangeCulture))
+                                 select new ConverterFieldInfo<T>(member, attribute, _rangeCulture))
             {
                 if (info.Attribute.IgnoreField)
                 {
