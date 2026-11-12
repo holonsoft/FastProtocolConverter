@@ -8,7 +8,9 @@
 
   <ItemGroup>
     <PackageReference Include="holonsoft.FluentConditions" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <!-- Part of the shared framework since net11.0, so it is only a package dependency below that. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"
+                      Condition="!$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0'))" />
   </ItemGroup>
 
   <ItemGroup>

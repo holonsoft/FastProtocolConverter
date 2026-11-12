@@ -1,0 +1,15 @@
+<Project>
+
+  <!-- This lives in .targets, not .props: .props is imported before the project body, so in a
+       project that sets a single TargetFramework the condition would see an empty value and the
+       setting would be skipped without notice. -->
+  <!-- Runtime async (the runtime, not the compiler, implements async state machines) is supported
+       from net11.0 on. Older targets do not support it, so it is switched on for net11.0+ only.
+       NOTE: the code base has no async methods at the moment, so this setting changes nothing yet.
+       It takes effect as soon as async code is added. -->
+  <PropertyGroup Condition="'$(TargetFramework)' != '' and
+      $([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0'))">
+    <Features>$(Features);runtime-async=on</Features>
+  </PropertyGroup>
+
+</Project>

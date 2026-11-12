@@ -3,7 +3,8 @@
 Converts raw bytes, for example from a hardware device, into an instance of a class and back again.
 You describe the frame with attributes on a POCO, and the converter does the rest.
 
-Supports .NET 8, .NET 9 and .NET 10.
+Supports .NET 10 and .NET 11. If you are still on .NET 8 or .NET 9, use version 4.0.x, see
+[Upgrading from 4.x to 5.0](#upgrading-from-4x-to-50).
 
 ## Fast, and measurably so
 
@@ -555,6 +556,32 @@ public class PocoWithRanges
 
 ```
 
+
+## Upgrading from 4.x to 5.0
+
+5.0 changes the supported target frameworks and nothing else. The API and the wire format are the
+same as in 4.0.
+
+**Breaking: .NET 8 and .NET 9 are no longer supported.** Both went out of support on
+10 November 2026. A project that targets `net8.0` or `net9.0` can't install 5.0 (NuGet error
+NU1202). Stay on **4.0.x** until you move to .NET 10 or later, it has the same features.
+
+**New: .NET 11.** The package contains a `net11.0` build. On .NET 11,
+`Microsoft.Extensions.Logging.Abstractions` is part of the shared framework, so the `net11.0` build
+no longer has a package dependency on it.
+
+**.NET 11 behavior changes, and why they don't reach your frames.**
+.NET 11 converts `double` and `float` to `decimal` close to exactly. Up to .NET 10 the conversion
+rounded to 15 (or 7) significant digits, so `(decimal)0.1` was `0.1` and is now
+`0.1000000000000000055511151231`. The converter never makes this conversion: a `decimal` goes on
+the wire as its four component integers (`decimal.GetBits`), and range limits are parsed from their
+strings. The test suite compares the exact bits, including the scale, on both runtimes. If *your*
+code fills a `decimal` field from a `double` before it writes the frame, the bytes on the wire will
+differ between .NET 10 and .NET 11. That happens before the converter sees the value, so use a
+`decimal` literal or `decimal.Parse` there.
+.NET 11 also makes unchecked `double`/`float` casts to `byte`, `sbyte`, `short`, `ushort` and
+`char` saturating. The converter doesn't make such casts either: floating point values are written
+and read as their raw bits.
 
 ## Upgrading from 3.x to 4.0
 

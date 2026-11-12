@@ -1,6 +1,6 @@
 name: Publish to NuGet
 
-# Triggered by version tags such as v3.7.0 or v3.7.0-preview.1.
+# Triggered by version tags such as v5.0.0 or v5.0.0-preview.1.
 # Authenticates against nuget.org with trusted publishing (OIDC), no API key is stored anywhere.
 # The nuget.org policy matches this file name (publish.yml) and the environment name (release),
 # and one policy is needed per package id (holonsoft.FastProtocolConverter and .Abstractions).
@@ -30,9 +30,8 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
-            8.0.x
-            9.0.x
             10.0.x
+            11.0.x
 
       - name: Build
         run: dotnet build FastProtocolConverter.slnx -c Release
