@@ -3,7 +3,7 @@
 All notable changes to holonsoft.FastProtocolConverter and holonsoft.FastProtocolConverter.Abstractions.
 The project follows [Semantic Versioning](https://semver.org/).
 
-## [5.0.0] - unreleased
+## [5.0.0] - 2026-11-12
 
 ### Breaking
 
