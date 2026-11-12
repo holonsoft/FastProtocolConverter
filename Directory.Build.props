@@ -1,14 +1,16 @@
 <Project>
 
   <PropertyGroup Label="Target frameworks">
-    <!-- Shared list for the packable libraries. Projects with other needs (tests, benchmarks) set their own. -->
-    <LibraryTargetFrameworks>net8.0;net9.0;net10.0</LibraryTargetFrameworks>
+    <!-- Shared list for the packable libraries and the test project, so the tests run on every
+         target framework the package ships. The benchmark project sets its own. -->
+    <!-- 5.0 dropped net8.0 and net9.0 (both out of support since 2026-11-10). Consumers on those
+         frameworks stay on 4.0.x. -->
+    <LibraryTargetFrameworks>net10.0;net11.0</LibraryTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup Label="Compiler">
-    <!-- No LangVersion override on purpose: each target framework uses its default C# version.
-         Forcing C# 14 onto net8.0/net9.0 breaks the target-typed conditionals in
-         ProtocolConverterToByteArray (CS1503), which only resolve against the net10.0 BCL. -->
+    <!-- No LangVersion override on purpose: each target framework uses its default C# version
+         (C# 14 on net10.0, C# 15 on net11.0). -->
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
@@ -23,6 +25,7 @@
     <RepositoryUrl>https://github.com/holonsoft/FastProtocolConverter</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>5.0.0: adds .NET 11. BREAKING: drops .NET 8 and .NET 9 (out of support), stay on 4.0.x for those. API and wire format unchanged, frames are byte identical on .NET 10 and .NET 11. Full notes: https://github.com/holonsoft/FastProtocolConverter/blob/main/CHANGELOG.md</PackageReleaseNotes>
     <PackageTags>protocol;converter;serialization;deserialization;binary;bytes;marshalling;hardware;poco</PackageTags>
   </PropertyGroup>
 
@@ -32,6 +35,9 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EnablePackageValidation>true</EnablePackageValidation>
+    <!-- Compare against the last shipped release, so a removed API or target framework fails the
+         build instead of slipping through. Intended breaks are listed in CompatibilitySuppressions.xml. -->
+    <PackageValidationBaselineVersion>4.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsPackable)' != 'false'">
@@ -39,13 +45,12 @@
   </ItemGroup>
 
   <PropertyGroup Label="Versioning">
-    <!-- MinVer derives the version from git tags (v4.0.0). Untagged commits become 4.0.0-preview.0.N. -->
-    <!-- A tag on the current commit always wins, even below the minimum, so a v3.6.x tag would be honored too. -->
-    <!-- The floor is 4.0 because main already carries breaking changes: short frames throw -->
-    <!-- ProtocolConverterException instead of ArgumentOutOfRangeException, range attributes are parsed -->
-    <!-- with the invariant culture, the big endian Guid format changed and overlap detection is stricter. -->
+    <!-- MinVer derives the version from git tags (v5.0.0). Untagged commits become 5.0.0-preview.0.N. -->
+    <!-- A tag on the current commit always wins, even below the minimum. -->
+    <!-- The floor is 5.0 because net8.0 and net9.0 were dropped, which breaks consumers on those -->
+    <!-- frameworks (NuGet NU1202). -->
     <MinVerTagPrefix>v</MinVerTagPrefix>
-    <MinVerMinimumMajorMinor>4.0</MinVerMinimumMajorMinor>
+    <MinVerMinimumMajorMinor>5.0</MinVerMinimumMajorMinor>
     <MinVerDefaultPreReleaseIdentifiers>preview.0</MinVerDefaultPreReleaseIdentifiers>
   </PropertyGroup>
 
